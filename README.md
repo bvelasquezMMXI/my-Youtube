@@ -31,13 +31,6 @@ subscribe button** colors the Subscribe button differently while unsubscribed
 and subscribed; each state has an optional hex field and color picker. The two
 color rows appear only while the option is checked.
 
-## Load unpacked
-
-1. Open `helium://extensions` (or `chrome://extensions` in Chromium).
-2. Enable **Developer mode**.
-3. Click **Load unpacked** and select this folder.
-4. Pin the extension and open its popup.
-
 ## Structure
 
 ```
