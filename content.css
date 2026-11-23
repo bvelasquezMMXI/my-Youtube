@@ -1,0 +1,166 @@
+html[data-ytc-videos-per-row] ytd-rich-grid-renderer {
+  --ytd-rich-grid-items-per-row: var(--ytc-videos-per-row) !important;
+  --ytd-rich-grid-item-margin: 3px !important;
+}
+
+html[data-ytc-videos-per-row] ytd-rich-grid-row,
+html[data-ytc-videos-per-row] #contents.ytd-rich-grid-row {
+  display: contents !important;
+}
+
+html[data-ytc-videos-per-row] :has(> ytd-rich-item-renderer[items-per-row]) {
+  display: flex !important;
+  flex-wrap: wrap !important;
+}
+
+html[data-ytc-videos-per-row] ytd-rich-grid-renderer > #contents {
+  display: grid !important;
+  grid-template-columns: repeat(var(--ytc-videos-per-row), minmax(0, 1fr)) !important;
+  grid-auto-flow: row dense !important;
+  column-gap: 3px !important;
+}
+
+html[data-ytc-videos-per-row] #contents > ytd-rich-item-renderer[items-per-row] {
+  width: auto !important;
+  max-width: none !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+html[data-ytc-videos-per-row] #contents > ytd-rich-section-renderer {
+  grid-column: 1 / -1 !important;
+}
+
+html[data-ytc-videos-per-row] .ytc-skip-intro,
+html[data-ytc-videos-per-row] [data-ytc-skip-intro] {
+  display: none !important;
+}
+
+html[data-ytc-videos-per-row] #contents > ytd-rich-grid-row > ytd-rich-item-renderer[items-per-row],
+html[data-ytc-videos-per-row] #contents > ytd-rich-grid-row > #contents > ytd-rich-item-renderer[items-per-row] {
+  width: auto !important;
+  max-width: none !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+html[data-ytc-videos-per-row] #contents > ytd-rich-item-renderer[items-per-row],
+html[data-ytc-videos-per-row] #contents > ytd-rich-grid-row > ytd-rich-item-renderer[items-per-row] {
+  container-type: inline-size !important;
+}
+
+html[data-ytc-videos-per-row] #contents > ytd-rich-item-renderer .ytLockupMetadataViewModelTitle,
+html[data-ytc-videos-per-row] #contents > ytd-rich-item-renderer .ytLockupMetadataViewModelTitle *,
+html[data-ytc-videos-per-row] #contents > ytd-rich-grid-row > ytd-rich-item-renderer .ytLockupMetadataViewModelTitle,
+html[data-ytc-videos-per-row] #contents > ytd-rich-grid-row > ytd-rich-item-renderer .ytLockupMetadataViewModelTitle *,
+html[data-ytc-videos-per-row] #contents > ytd-rich-item-renderer #video-title {
+  font-size: clamp(10px, 4.8cqw, 16px) !important;
+  line-height: 1.3 !important;
+}
+
+html[data-ytc-videos-per-row] #contents > ytd-rich-item-renderer .ytContentMetadataViewModelHost,
+html[data-ytc-videos-per-row] #contents > ytd-rich-item-renderer .ytContentMetadataViewModelMetadataText,
+html[data-ytc-videos-per-row] #contents > ytd-rich-item-renderer #metadata-line,
+html[data-ytc-videos-per-row] #contents > ytd-rich-item-renderer #channel-name,
+html[data-ytc-videos-per-row] #contents > ytd-rich-grid-row > ytd-rich-item-renderer .ytContentMetadataViewModelHost,
+html[data-ytc-videos-per-row] #contents > ytd-rich-grid-row > ytd-rich-item-renderer .ytContentMetadataViewModelMetadataText,
+html[data-ytc-videos-per-row] #contents > ytd-rich-grid-row > ytd-rich-item-renderer #metadata-line,
+html[data-ytc-videos-per-row] #contents > ytd-rich-grid-row > ytd-rich-item-renderer #channel-name {
+  font-size: clamp(9px, 4.05cqw, 14px) !important;
+  line-height: 1.3 !important;
+}
+
+html[data-ytc-videos-per-row] #home-container-media {
+  display: grid !important;
+  grid-template-columns: repeat(var(--ytc-videos-per-row), minmax(0, 1fr)) !important;
+  column-gap: 3px !important;
+}
+
+.ytc-no-ai,
+.ytc-sidebar-hidden {
+  display: none !important;
+}
+
+.ytc-subscriptions-redacted [data-ytc-subscription-name] {
+  filter: blur(4px) !important;
+  user-select: none !important;
+}
+
+.ytc-dislike-count {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  flex: 0 0 auto;
+  margin-inline-start: 4px;
+  padding-inline-start: 3px;
+  color: var(--yt-spec-text-primary, #0f0f0f);
+  font: 500 14px/1 Roboto, Arial, sans-serif;
+  white-space: nowrap;
+}
+
+html[data-ytc-colored-subscribe] :is(ytd-subscribe-button-renderer, yt-subscribe-button-view-model)[data-ytc-subscribed="false"] button {
+  background-color: var(--ytc-subscribe-color, #cc0000) !important;
+  color: var(--ytc-subscribe-text, #ffffff) !important;
+}
+
+html[data-ytc-colored-subscribe] :is(ytd-subscribe-button-renderer, yt-subscribe-button-view-model)[data-ytc-subscribed="false"] button:hover,
+html[data-ytc-colored-subscribe] :is(ytd-subscribe-button-renderer, yt-subscribe-button-view-model)[data-ytc-subscribed="false"] button:active {
+  background-color: var(--ytc-subscribe-color, #cc0000) !important;
+}
+
+html[data-ytc-colored-subscribe] :is(ytd-subscribe-button-renderer, yt-subscribe-button-view-model)[data-ytc-subscribed="false"] button * {
+  color: var(--ytc-subscribe-text, #ffffff) !important;
+}
+
+html[data-ytc-colored-subscribe] :is(ytd-subscribe-button-renderer, yt-subscribe-button-view-model)[data-ytc-subscribed="true"] button {
+  background-color: var(--ytc-subscribed-color, #606060) !important;
+  color: var(--ytc-subscribed-text, #ffffff) !important;
+}
+
+html[data-ytc-colored-subscribe] :is(ytd-subscribe-button-renderer, yt-subscribe-button-view-model)[data-ytc-subscribed="true"] button:hover,
+html[data-ytc-colored-subscribe] :is(ytd-subscribe-button-renderer, yt-subscribe-button-view-model)[data-ytc-subscribed="true"] button:active {
+  background-color: var(--ytc-subscribed-color, #606060) !important;
+}
+
+html[data-ytc-colored-subscribe] :is(ytd-subscribe-button-renderer, yt-subscribe-button-view-model)[data-ytc-subscribed="true"] button * {
+  color: var(--ytc-subscribed-text, #ffffff) !important;
+}
+
+html[data-ytc-hover-highlights="off"] .ytSpecTouchFeedbackShapeHoverEffect {
+  opacity: 0 !important;
+}
+
+html[data-ytc-font] body,
+html[data-ytc-font] body * {
+  font-family: var(--ytc-font) !important;
+}
+
+html[data-ytc-ui-radius] *:not(:is(
+  h1, h1 *,
+  h2, h2 *,
+  h3, h3 *,
+  h4, h4 *,
+  h5, h5 *,
+  h6, h6 *,
+  #video-title, #video-title *,
+  #metadata-line, #metadata-line *,
+  #channel-name, #channel-name *,
+  #metadata, #metadata *,
+  .ytd-video-meta-block, .ytd-video-meta-block *,
+  .ytLockupMetadataViewModelTitle, .ytLockupMetadataViewModelTitle *,
+  .ytLockupMetadataViewModelMetadata, .ytLockupMetadataViewModelMetadata *,
+  .ytContentMetadataViewModelHost, .ytContentMetadataViewModelHost *,
+  .ytContentMetadataViewModelMetadataRow, .ytContentMetadataViewModelMetadataRow *,
+  .ytContentMetadataViewModelMetadataText, .ytContentMetadataViewModelMetadataText *,
+  [data-ytc-no-radius], [data-ytc-no-radius] *
+)) {
+  border-radius: var(--ytc-ui-radius) !important;
+}
+
+html[data-ytc-videos-per-row] #home-container-media > .rich-grid-media-skeleton {
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  margin-inline: 0 !important;
+  flex: none !important;
+}

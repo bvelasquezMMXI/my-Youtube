@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>YouTube Customizer</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <img src="icons/icon48.png" alt="" width="10" height="10">
+    <h1>YouTube Customizer</h1>
+  </header>
+
+  <nav class="subtabs" id="subtabs" role="tablist" aria-orientation="horizontal" aria-label="Options"></nav>
+
+  <main>
+    <section class="panel" id="panel" role="tabpanel">
+      <p class="empty" id="panel-empty"></p>
+      <div class="option" id="videos-per-row" hidden>
+        <label class="option-label" for="videos-per-row-number">Videos per row</label>
+        <input class="option-number" id="videos-per-row-number" type="number" min="1" max="8" step="1" value="4">
+        <input class="option-range" id="videos-per-row-range" type="range" min="1" max="8" step="1" value="4" aria-label="Videos per row slider">
+      </div>
+      <div class="option" id="ui-corner-radii" hidden>
+        <label class="option-label" for="ui-corner-radii-number">UI corner radii</label>
+        <input class="option-number" id="ui-corner-radii-number" type="number" min="0" max="30" step="1" value="12">
+        <input class="option-range" id="ui-corner-radii-range" type="range" min="0" max="30" step="1" value="12" aria-label="UI corner radii slider">
+      </div>
+      <div class="option option-toggle" id="no-ai" hidden>
+        <label class="option-label" for="no-ai-checkbox">
+          <input class="option-check" id="no-ai-checkbox" type="checkbox">
+          <span>Remove "Ask Youtube" ui element</span>
+        </label>
+      </div>
+      <div class="option option-toggle" id="hover-highlights" hidden>
+        <label class="option-label" for="hover-highlights-checkbox">
+          <input class="option-check" id="hover-highlights-checkbox" type="checkbox" checked>
+          <span>Hover highlights</span>
+        </label>
+      </div>
+      <div class="option option-select-row" id="font-family" hidden>
+        <label class="option-label" for="font-family-select">Font</label>
+        <select class="option-select" id="font-family-select" aria-label="Font">
+          <option value="">Original</option>
+          <option value="Arial, sans-serif">Arial</option>
+          <option value="Helvetica, Arial, sans-serif">Helvetica</option>
+          <option value="Verdana, Geneva, sans-serif">Verdana</option>
+          <option value="Tahoma, Verdana, sans-serif">Tahoma</option>
+          <option value="'Trebuchet MS', Arial, sans-serif">Trebuchet MS</option>
+          <option value="Georgia, 'Times New Roman', serif">Georgia</option>
+          <option value="'Times New Roman', Times, serif">Times New Roman</option>
+          <option value="'Courier New', monospace">Courier New</option>
+          <option value="Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif">Impact</option>
+        </select>
+        <button class="option-upload" id="font-upload" type="button">Upload</button>
+        <input id="font-file" type="file" accept=".woff2,.woff,.ttf,.otf,font/*" hidden>
+      </div>
+      <div id="sidebar-options" hidden>
+        <div class="sidebar-tree" id="sidebar-tree"></div>
+        <p class="empty" id="sidebar-empty" hidden></p>
+      </div>
+      <div class="option option-toggle" id="add-dislikes" hidden>
+        <label class="option-label" for="add-dislikes-checkbox">
+          <input class="option-check" id="add-dislikes-checkbox" type="checkbox" checked>
+          <span>Add dislikes</span>
+        </label>
+      </div>
+      <div class="option option-toggle" id="colored-subscribe" hidden>
+        <label class="option-label" for="colored-subscribe-checkbox">
+          <input class="option-check" id="colored-subscribe-checkbox" type="checkbox" checked>
+          <span>Colored subscribe button</span>
+        </label>
+      </div>
+      <div class="color-suboptions" id="subscribe-colors" hidden>
+        <div class="option option-color" id="subscribe-color">
+          <label class="option-label" for="subscribe-color-hex">Not subscribed</label>
+          <input class="option-hex" id="subscribe-color-hex" type="text" value="#cc0000" maxlength="7" spellcheck="false" aria-label="Not subscribed hex color">
+          <input class="option-swatch" id="subscribe-color-picker" type="color" value="#cc0000" aria-label="Not subscribed color picker">
+        </div>
+        <div class="option option-color" id="subscribed-color">
+          <label class="option-label" for="subscribed-color-hex">Subscribed</label>
+          <input class="option-hex" id="subscribed-color-hex" type="text" value="#606060" maxlength="7" spellcheck="false" aria-label="Subscribed hex color">
+          <input class="option-swatch" id="subscribed-color-picker" type="color" value="#606060" aria-label="Subscribed color picker">
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <aside class="sidebar" role="tablist" aria-orientation="vertical" aria-label="Modification categories">
+    <button class="tab" id="tab-home" type="button" role="tab" aria-controls="panel" data-subtabs="Main|Sidebar" aria-selected="true">Home</button>
+    <button class="tab" id="tab-player" type="button" role="tab" aria-controls="panel" data-subtabs="Main|Autoplay|Controls" aria-selected="false">Player</button>
+    <button class="tab" id="tab-comments" type="button" role="tab" aria-controls="panel" data-subtabs="Visibility|Sort|Replies" aria-selected="false">Comments</button>
+    <button class="tab" id="tab-shorts" type="button" role="tab" aria-controls="panel" data-subtabs="Shelves|Nav" aria-selected="false">Shorts</button>
+    <button class="tab" id="tab-search" type="button" role="tab" aria-controls="panel" data-subtabs="Results|Suggestions" aria-selected="false">Search</button>
+  </aside>
+
+  <script src="popup.js"></script>
+</body>
+</html>
