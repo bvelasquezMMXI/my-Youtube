@@ -77,7 +77,8 @@ html[data-ytc-videos-per-row] #home-container-media {
 }
 
 .ytc-no-ai,
-.ytc-sidebar-hidden {
+.ytc-sidebar-hidden,
+.ytc-hashtag-hidden {
   display: none !important;
 }
 

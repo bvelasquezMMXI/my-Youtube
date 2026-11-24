@@ -28,10 +28,44 @@ const subscribeColorHex = document.getElementById("subscribe-color-hex");
 const subscribeColorPicker = document.getElementById("subscribe-color-picker");
 const subscribedColorHex = document.getElementById("subscribed-color-hex");
 const subscribedColorPicker = document.getElementById("subscribed-color-picker");
+const removeHashtagsOption = document.getElementById("remove-hashtags");
+const removeHashtagsCheckbox = document.getElementById("remove-hashtags-checkbox");
 const syncStorage = globalThis.chrome?.storage?.sync;
 const localStore = globalThis.chrome?.storage?.local;
 let sidebarItems = [];
 let sidebarHidden = new Set();
+let lastYouTubePing = 0;
+let lastYouTubeReload = 0;
+
+function ensureYouTubeTab() {
+  const chromeApi = globalThis.chrome;
+  const tabs = chromeApi?.tabs;
+  if (!tabs?.query || !tabs?.sendMessage) return;
+
+  const now = Date.now();
+  if (now - lastYouTubePing < 2000) return;
+  lastYouTubePing = now;
+
+  tabs.query({ active: true, currentWindow: true }, (result) => {
+    const tab = result && result[0];
+    if (!tab || typeof tab.id !== "number" || typeof tab.url !== "string") return;
+    if (!/^https?:\/\/(?:[^/]+\.)?youtube\.com\//i.test(tab.url)) return;
+
+    tabs.sendMessage(tab.id, { type: "ytc-ping" }, (response) => {
+      if (!chromeApi.runtime?.lastError && response?.ok) return;
+      if (Date.now() - lastYouTubeReload < 5000) return;
+      lastYouTubeReload = Date.now();
+      tabs.reload(tab.id, () => {
+        void chromeApi.runtime?.lastError;
+      });
+    });
+  });
+}
+
+function saveSync(values) {
+  ensureYouTubeTab();
+  syncStorage?.set(values);
+}
 
 function clampRowValue(value) {
   const min = Number(rowRange.min);
@@ -82,7 +116,7 @@ function saveVideosPerRow() {
 }
 
 function saveUiRadius() {
-  syncStorage?.set({ uiRadius: Number(cornerRange.value) });
+  saveSync({ uiRadius: Number(cornerRange.value) });
 }
 
 function customFontValue(font) {
@@ -135,6 +169,7 @@ function renderSidebarTree() {
       } else {
         sidebarHidden.add(item.key);
       }
+      ensureYouTubeTab();
       localStore?.set({ sidebarHidden: Array.from(sidebarHidden) });
       renderSidebarTree();
     });
@@ -173,14 +208,14 @@ function bindColorControls(hexInput, picker, key) {
     const color = normalizeHexColor(picker.value);
     if (!color) return;
     hexInput.value = color;
-    syncStorage?.set({ [key]: color });
+    saveSync({ [key]: color });
   });
 
   hexInput.addEventListener("input", () => {
     const color = normalizeHexColor(hexInput.value);
     if (!color) return;
     picker.value = color;
-    syncStorage?.set({ [key]: color });
+    saveSync({ [key]: color });
   });
 
   hexInput.addEventListener("change", () => {
@@ -188,7 +223,7 @@ function bindColorControls(hexInput, picker, key) {
     const color = normalizeHexColor(hexInput.value) || normalizeHexColor(picker.value) || fallback;
     hexInput.value = color;
     picker.value = color;
-    syncStorage?.set({ [key]: color });
+    saveSync({ [key]: color });
   });
 }
 
@@ -208,6 +243,7 @@ function applySettings(settings) {
   hoverCheckbox.checked = settings.hoverHighlights !== false;
   addDislikesCheckbox.checked = settings.addDislikes !== false;
   coloredSubscribeCheckbox.checked = settings.coloredSubscribe !== false;
+  removeHashtagsCheckbox.checked = Boolean(settings.removeHashtags);
   setColorInputs(subscribeColorHex, subscribeColorPicker, settings.subscribeColor, "#cc0000");
   setColorInputs(subscribedColorHex, subscribedColorPicker, settings.subscribedColor, "#606060");
   updateColorOptionVisibility();
@@ -222,6 +258,7 @@ const settingsDefaults = {
   hoverHighlights: true,
   addDislikes: true,
   coloredSubscribe: true,
+  removeHashtags: false,
   subscribeColor: "#cc0000",
   subscribedColor: "#606060",
   fontFamily: ""
@@ -310,7 +347,7 @@ fontFile.addEventListener("change", () => {
         const font = { id, name, dataUrl, format };
         addCustomFontOption(font);
         fontSelect.value = customFontValue(font);
-        syncStorage?.set({ fontFamily: customFontValue(font) });
+        saveSync({ fontFamily: customFontValue(font) });
         fontUpload.textContent = "Added";
         setTimeout(resetUploadLabel, 1200);
       });
@@ -320,27 +357,31 @@ fontFile.addEventListener("change", () => {
 });
 
 noAICheckbox.addEventListener("change", () => {
-  syncStorage?.set({ noAI: noAICheckbox.checked });
+  saveSync({ noAI: noAICheckbox.checked });
 });
 
 hoverCheckbox.addEventListener("change", () => {
-  syncStorage?.set({ hoverHighlights: hoverCheckbox.checked });
+  saveSync({ hoverHighlights: hoverCheckbox.checked });
 });
 
 addDislikesCheckbox.addEventListener("change", () => {
-  syncStorage?.set({ addDislikes: addDislikesCheckbox.checked });
+  saveSync({ addDislikes: addDislikesCheckbox.checked });
 });
 
 coloredSubscribeCheckbox.addEventListener("change", () => {
-  syncStorage?.set({ coloredSubscribe: coloredSubscribeCheckbox.checked });
+  saveSync({ coloredSubscribe: coloredSubscribeCheckbox.checked });
   updateColorOptionVisibility();
+});
+
+removeHashtagsCheckbox.addEventListener("change", () => {
+  saveSync({ removeHashtags: removeHashtagsCheckbox.checked });
 });
 
 bindColorControls(subscribeColorHex, subscribeColorPicker, "subscribeColor");
 bindColorControls(subscribedColorHex, subscribedColorPicker, "subscribedColor");
 
 fontSelect.addEventListener("change", () => {
-  syncStorage?.set({ fontFamily: fontSelect.value });
+  saveSync({ fontFamily: fontSelect.value });
 });
 
 cornerRange.addEventListener("input", () => {
@@ -407,6 +448,7 @@ function selectSubtab(tab) {
   sidebarOptions.hidden = !hasSidebarOptions;
   addDislikesOption.hidden = !hasPlayerMainOptions;
   coloredSubscribeOption.hidden = !hasPlayerMainOptions;
+  removeHashtagsOption.hidden = !hasPlayerMainOptions;
   updateColorOptionVisibility();
   panelEmpty.hidden = hasMainOptions || hasSidebarOptions || hasPlayerMainOptions;
 }

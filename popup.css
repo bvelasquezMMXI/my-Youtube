@@ -114,7 +114,8 @@ main {
   display: none;
 }
 
-.option + .option {
+.option + .option,
+.color-suboptions + .option {
   margin-top: 10px;
 }
 

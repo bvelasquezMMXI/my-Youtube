@@ -4,6 +4,26 @@ const CACHE_KEY = "ytc-videos-per-row";
 const SKIP_CLASS = "ytc-skip-intro";
 const SKIP_ATTR = "data-ytc-skip-intro";
 const NO_AI_CLASS = "ytc-no-ai";
+const NO_AI_CANDIDATE_SELECTOR = 'button, a[role="button"], [role="button"], ytd-button-renderer, yt-button-shape, tp-yt-paper-button, [class*="ask-youtube" i], [class*="askyoutube" i], [id*="ask-youtube" i], [id*="askyoutube" i]';
+const NO_AI_TARGET_SELECTOR = [
+  "yt-video-description-youchat-section-view-model",
+  "yt-button-view-model:has(.you-chat-entrypoint-button)",
+  ".you-chat-entrypoint-button"
+].join(", ");
+const HASHTAG_HIDDEN_CLASS = "ytc-hashtag-hidden";
+const HASHTAG_SCOPE_SELECTOR = [
+  "ytd-watch-metadata",
+  "ytd-reel-player-overlay-renderer",
+  "yt-lockup-metadata-view-model",
+  "ytd-reel-item-renderer",
+  "yt-shorts-lockup-view-model-v2",
+  "#title",
+  "#video-title",
+  "#description",
+  "#description-inline-expander",
+  "#description-text"
+].join(", ");
+const HASHTAG_TEXT_PATTERN = /(^|\s)#[\p{L}\p{N}\p{M}_]+/gu;
 const DISLIKE_COUNT_CLASS = "ytc-dislike-count";
 const DISLIKE_ARIA_ATTR = "data-ytc-dislike-aria";
 const DISLIKE_STYLE_ATTR = "data-ytc-dislike-style";
@@ -37,6 +57,8 @@ let currentUiRadius = DEFAULT_UI_RADIUS;
 let currentHoverHighlights = true;
 let currentFontFamily = "";
 let noAISetting = false;
+let removeHashtagsEnabled = false;
+let hashtagTextOriginals = new Map();
 let introStyle = null;
 let sidebarHiddenKeys = new Set();
 let lastSidebarTreeJSON = "";
@@ -93,7 +115,7 @@ function applyFontFamily(value) {
 function applyHoverHighlights(value) {
   currentHoverHighlights = Boolean(value);
   const root = document.documentElement;
-  if (currentHoverHighlights || !isHomeFeed()) delete root.dataset.ytcHoverHighlights;
+  if (currentHoverHighlights) delete root.dataset.ytcHoverHighlights;
   else root.dataset.ytcHoverHighlights = "off";
 }
 
@@ -152,26 +174,104 @@ function applyNoAI(value) {
   if (noAISetting) syncSearchPlaceholder();
   else restoreSearchPlaceholder();
 
-  if (!noAISetting || !isHomeFeed()) {
+  if (!noAISetting) {
     for (const node of marked) node.classList.remove(NO_AI_CLASS);
     return;
   }
 
-  const candidates = document.querySelectorAll(
-    'button, a[role="button"], [role="button"], ytd-button-renderer, yt-button-shape, tp-yt-paper-button, [class*="ask-youtube" i], [class*="askyoutube" i], [id*="ask-youtube" i], [id*="askyoutube" i]'
-  );
-  for (const node of candidates) {
-    const label = `${node.getAttribute("aria-label") || ""} ${node.innerText || ""}`.replace(/\s+/g, " ").trim();
-    const className = typeof node.className === "string" ? node.className : "";
-    const matchesLabel = /^ask(?:\s+youtube)?$/i.test(label) || /\bask\s+youtube\b/i.test(label);
-    const matchesClass = /ask-?youtube/i.test(`${node.id} ${className}`);
-    if (!matchesLabel && !matchesClass) continue;
-
-    const target = node.closest("button-view-model") ||
-      node.closest("button, ytd-button-renderer, tp-yt-paper-button, a[role='button'], [role='button']") ||
-      node;
+  // The watch page's Ask YouTube entry point and its description section.
+  for (const node of document.querySelectorAll(NO_AI_TARGET_SELECTOR)) {
+    const target = node.closest("yt-button-view-model") || node;
     target.classList.add(NO_AI_CLASS);
   }
+
+  // Home scans the whole page; watch pages only need their metadata block,
+  // which keeps the label scan off the comments.
+  const scopes = isHomeFeed() ? [document] : Array.from(document.querySelectorAll("ytd-watch-metadata"));
+  for (const scope of scopes) {
+    for (const node of scope.querySelectorAll(NO_AI_CANDIDATE_SELECTOR)) {
+      const ariaLabel = (node.getAttribute("aria-label") || "").replace(/\s+/g, " ").trim();
+      const text = (node.innerText || "").replace(/\s+/g, " ").trim();
+      const className = typeof node.className === "string" ? node.className : "";
+      const matchesLabel = [ariaLabel, text].some((value) =>
+        Boolean(value) && (
+          /^ask(?:\s+youtube)?$/i.test(value) ||
+          /\bask\s+youtube\b/i.test(value) ||
+          /\bask about (?:this|the) video\b/i.test(value)
+        )
+      );
+      const matchesClass = /ask-?youtube/i.test(`${node.id} ${className}`);
+      if (!matchesLabel && !matchesClass) continue;
+
+      const target = node.closest("button-view-model") ||
+        node.closest("button, ytd-button-renderer, tp-yt-paper-button, a[role='button'], [role='button']") ||
+        node;
+      target.classList.add(NO_AI_CLASS);
+    }
+  }
+}
+
+function stripHashtagsFromTextNode(node) {
+  const record = hashtagTextOriginals.get(node);
+  if (record && node.nodeValue === record.stripped) return;
+
+  const original = node.nodeValue || "";
+  if (original.indexOf("#") === -1) {
+    if (record) hashtagTextOriginals.delete(node);
+    return;
+  }
+
+  const stripped = original.replace(HASHTAG_TEXT_PATTERN, "$1").replace(/[ \t]{2,}/g, " ");
+  if (stripped === original) {
+    if (record) hashtagTextOriginals.delete(node);
+    return;
+  }
+
+  hashtagTextOriginals.set(node, { original, stripped });
+  if (node.nodeValue !== stripped) node.nodeValue = stripped;
+}
+
+function restoreHashtags() {
+  for (const [node, record] of hashtagTextOriginals) {
+    if (node.isConnected && node.nodeValue === record.stripped) node.nodeValue = record.original;
+  }
+  hashtagTextOriginals.clear();
+
+  for (const anchor of document.querySelectorAll(`.${HASHTAG_HIDDEN_CLASS}`)) {
+    anchor.classList.remove(HASHTAG_HIDDEN_CLASS);
+  }
+}
+
+function stripHashtags() {
+  if (hashtagTextOriginals.size > 500) {
+    for (const node of hashtagTextOriginals.keys()) {
+      if (!node.isConnected) hashtagTextOriginals.delete(node);
+    }
+  }
+
+  for (const scope of document.querySelectorAll(HASHTAG_SCOPE_SELECTOR)) {
+    for (const anchor of scope.querySelectorAll('a[href*="/hashtag/"]')) {
+      anchor.classList.add(HASHTAG_HIDDEN_CLASS);
+    }
+
+    const walker = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT);
+    let node;
+    while ((node = walker.nextNode())) {
+      const parent = node.parentElement;
+      if (!parent || parent.closest('a[href*="/hashtag/"]')) continue;
+      if (parent.closest("script, style, noscript")) continue;
+      stripHashtagsFromTextNode(node);
+    }
+  }
+}
+
+function applyRemoveHashtags(value) {
+  removeHashtagsEnabled = Boolean(value);
+  if (!removeHashtagsEnabled) {
+    restoreHashtags();
+    return;
+  }
+  stripHashtags();
 }
 
 function getDislikeVideoId() {
@@ -775,6 +875,7 @@ function scheduleItemSync() {
     syncSidebar();
     syncDislikes();
     syncSubscribeButtons();
+    applyRemoveHashtags(removeHashtagsEnabled);
   }, 300);
 }
 
@@ -820,6 +921,7 @@ for (const eventName of ["yt-navigate-finish", "yt-page-data-updated", "popstate
     syncSidebar();
     syncDislikes();
     syncSubscribeButtons();
+    applyRemoveHashtags(removeHashtagsEnabled);
   });
 }
 
@@ -831,14 +933,16 @@ document.addEventListener("click", (event) => {
   setTimeout(syncSubscribeButtons, 1500);
 }, true);
 
-globalThis.chrome?.storage?.local?.get({ customFonts: [], sidebarHidden: [] }, (data) => {
-  injectCustomFonts(data.customFonts);
-  sidebarHiddenKeys = new Set(Array.isArray(data.sidebarHidden) ? data.sidebarHidden.filter((key) => typeof key === "string") : []);
-  applySidebarHidden();
-  syncSidebar();
-});
+function loadLocalSettings() {
+  globalThis.chrome?.storage?.local?.get({ customFonts: [], sidebarHidden: [] }, (data) => {
+    injectCustomFonts(data.customFonts);
+    sidebarHiddenKeys = new Set(Array.isArray(data.sidebarHidden) ? data.sidebarHidden.filter((key) => typeof key === "string") : []);
+    applySidebarHidden();
+    syncSidebar();
+  });
+}
 
-chrome.storage.sync.get({ videosPerRow: DEFAULT_VIDEOS_PER_ROW, uiRadius: DEFAULT_UI_RADIUS, noAI: false, hoverHighlights: true, addDislikes: true, coloredSubscribe: true, subscribeColor: DEFAULT_SUBSCRIBE_COLOR, subscribedColor: DEFAULT_SUBSCRIBED_COLOR, fontFamily: "" }, (settings) => {
+function applySyncSettings(settings) {
   applyVideosPerRow(settings.videosPerRow);
   applyUiRadius(settings.uiRadius);
   applyHoverHighlights(settings.hoverHighlights);
@@ -847,7 +951,38 @@ chrome.storage.sync.get({ videosPerRow: DEFAULT_VIDEOS_PER_ROW, uiRadius: DEFAUL
   syncSidebar();
   applyAddDislikes(settings.addDislikes !== false);
   applyColoredSubscribe(settings.coloredSubscribe !== false, settings.subscribeColor, settings.subscribedColor);
+  applyRemoveHashtags(settings.removeHashtags);
+}
+
+function loadSyncSettings() {
+  globalThis.chrome?.storage?.sync?.get({ videosPerRow: DEFAULT_VIDEOS_PER_ROW, uiRadius: DEFAULT_UI_RADIUS, noAI: false, hoverHighlights: true, addDislikes: true, coloredSubscribe: true, subscribeColor: DEFAULT_SUBSCRIBE_COLOR, subscribedColor: DEFAULT_SUBSCRIBED_COLOR, fontFamily: "", removeHashtags: false }, applySyncSettings);
+}
+
+loadLocalSettings();
+loadSyncSettings();
+
+// A page restored from bfcache, prerendered, or frozen can miss storage
+// events. Re-read both areas whenever the page becomes visible again.
+function reloadSettings() {
+  loadSyncSettings();
+  loadLocalSettings();
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") reloadSettings();
 });
+window.addEventListener("pageshow", reloadSettings);
+
+// The popup pings this listener; a missed response means this content script
+// belongs to a dead extension context and the popup refreshes the tab.
+if (!globalThis.__ytcMessageListener) {
+  globalThis.__ytcMessageListener = true;
+  globalThis.chrome?.runtime?.onMessage?.addListener((message, sender, sendResponse) => {
+    if (message?.type !== "ytc-ping") return false;
+    sendResponse({ ok: true });
+    return false;
+  });
+}
 
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "local") {
@@ -864,6 +999,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (changes.hoverHighlights) applyHoverHighlights(changes.hoverHighlights.newValue);
   if (changes.fontFamily) applyFontFamily(changes.fontFamily.newValue);
   if (changes.noAI) applyNoAI(changes.noAI.newValue);
+  if (changes.removeHashtags) applyRemoveHashtags(changes.removeHashtags.newValue);
   if (changes.addDislikes) applyAddDislikes(changes.addDislikes.newValue);
   if (changes.coloredSubscribe || changes.subscribeColor || changes.subscribedColor) {
     applyColoredSubscribe(

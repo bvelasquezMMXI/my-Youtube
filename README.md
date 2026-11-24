@@ -13,9 +13,11 @@ has a **UI corner radii** slider (0-30 px) that rounds media, avatars, buttons,
 and containers on Home and video pages, including thumbnails and profile
 pictures. Card titles and channel/view metadata keep their native corners;
 video progress bars and autoplay controls are excluded. A **Remove "Ask Youtube"
-ui element** toggle hides the Ask YouTube entry point and replaces the search
-placeholder with "Search", and **Hover highlights** toggles YouTube's hover
-overlay on video cards. A **Font** selector offers ten choices; **Original**
+ui element** toggle hides the Ask YouTube entry point, including the Ask
+section and button in video descriptions, and replaces the search placeholder
+with "Search", and **Hover highlights** toggles YouTube's hover
+overlay on video cards, including the highlight around recommended videos on
+watch pages. A **Font** selector offers ten choices; **Original**
 restores YouTube's unmodified fonts, while the others apply to all text. The
 **Upload** button beside it accepts woff2/woff/ttf/otf files, stores the font
 locally, injects it with `@font-face`, and appends it to the font list. The
@@ -29,7 +31,9 @@ dislike button using the Return YouTube Dislike API. The button widens to fit
 the count; counts are cached by the background service worker. **Colored
 subscribe button** colors the Subscribe button differently while unsubscribed
 and subscribed; each state has an optional hex field and color picker. The two
-color rows appear only while the option is checked.
+color rows appear only while the option is checked. **Remove hashtags** strips
+hashtags from video titles and descriptions on watch pages, cards, and Shorts,
+and hides hashtag links; turning it off restores the original text.
 
 ## Load unpacked
 
