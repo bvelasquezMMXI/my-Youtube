@@ -586,9 +586,8 @@ function markCollapsibleSubscriptionNames(collapsible) {
     if (entry.closest("#header")) continue;
     const title = sidebarEntryTitle(entry);
     if (!title || /^show (?:more|less)$/i.test(title)) continue;
-    const name = entry.querySelector(".title, #label, yt-formatted-string.title") || entry;
-    if (!name.hasAttribute(SUBSCRIPTION_NAME_ATTR)) {
-      name.setAttribute(SUBSCRIPTION_NAME_ATTR, "");
+    if (!entry.hasAttribute(SUBSCRIPTION_NAME_ATTR)) {
+      entry.setAttribute(SUBSCRIPTION_NAME_ATTR, "");
     }
   }
 }
@@ -599,9 +598,8 @@ function markSubscriptionNames(section) {
     if (entry.closest("ytd-guide-section-renderer") !== section) continue;
     const title = sidebarEntryTitle(entry);
     if (!title || /^show (?:more|less)$/i.test(title)) continue;
-    const name = entry.querySelector(".title, #label, yt-formatted-string.title") || entry;
-    if (!name.hasAttribute(SUBSCRIPTION_NAME_ATTR)) {
-      name.setAttribute(SUBSCRIPTION_NAME_ATTR, "");
+    if (!entry.hasAttribute(SUBSCRIPTION_NAME_ATTR)) {
+      entry.setAttribute(SUBSCRIPTION_NAME_ATTR, "");
     }
   }
 }
@@ -685,15 +683,12 @@ function buildSidebarTree() {
           addSidebarItem(tree, {
             key,
             title,
-            children: [
-              {
-                key: SUBSCRIPTION_HIDE_KEY,
-                title: "Hide Subscriptions",
-                children: [],
-                inverted: true
-              },
-              ...collectSidebarEntries(section, key, usedKeys)
-            ]
+            children: [{
+              key: SUBSCRIPTION_HIDE_KEY,
+              title: "Redact subscriptions (weirdo)",
+              children: [],
+              inverted: true
+            }]
           });
         } else {
           section.removeAttribute(SUBSCRIPTIONS_SECTION_ATTR);
@@ -719,15 +714,12 @@ function buildSidebarTree() {
               addSidebarItem(tree, {
                 key,
                 title,
-                children: [
-                  {
-                    key: SUBSCRIPTION_HIDE_KEY,
-                    title: "Hide Subscriptions",
-                    children: [],
-                    inverted: true
-                  },
-                  ...collectCollapsibleEntries(node, key, usedKeys)
-                ]
+                children: [{
+                  key: SUBSCRIPTION_HIDE_KEY,
+                  title: "Redact subscriptions (weirdo)",
+                  children: [],
+                  inverted: true
+                }]
               });
             } else {
               addSidebarItem(tree, {
