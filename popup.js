@@ -55,29 +55,18 @@ const colorScopes = [
       { key: "details", label: "Video details", fallback: "#ffffff" },
       { key: "comments", label: "Comments", fallback: "#ffffff" },
       { key: "subscribe", label: "Subscribe (not subscribed)", fallback: "#cc0000" },
-      { key: "subscribed", label: "Subscribe (subscribed)", fallback: "#606060" }
-    ]
-  },
-  {
-    prefix: "theme",
-    label: "Themes",
-    option: document.getElementById("theme-colors"),
-    checkbox: document.getElementById("theme-colors-checkbox"),
-    suboptions: document.getElementById("theme-color-options"),
-    fields: [
-      { key: "text", label: "Text", fallback: "#0f0f0f" },
-      { key: "background", label: "Background", fallback: "#ffffff" },
-      { key: "header", label: "Header", fallback: "#ffffff" },
-      { key: "guide", label: "Guide", fallback: "#ffffff" },
-      { key: "cards", label: "Cards", fallback: "#ffffff" },
-      { key: "recommended", label: "Recommended", fallback: "#ffffff" },
-      { key: "details", label: "Video details", fallback: "#ffffff" },
-      { key: "comments", label: "Comments", fallback: "#ffffff" }
+      { key: "subscribeText", label: "Subscribe text (not subscribed)", fallback: "#ffffff" },
+      { key: "subscribed", label: "Subscribe (subscribed)", fallback: "#606060" },
+      { key: "subscribedText", label: "Subscribe text (subscribed)", fallback: "#ffffff" }
     ]
   }
 ];
 const syncStorage = globalThis.chrome?.storage?.sync;
 const localStore = globalThis.chrome?.storage?.local;
+const legacyColorFallbacks = new Map();
+for (const scope of colorScopes) {
+  for (const field of scope.fields) legacyColorFallbacks.set(`${scope.prefix}:${field.key}`, field.fallback);
+}
 let sidebarItems = [];
 let sidebarHidden = new Set();
 const colorState = {};
@@ -178,6 +167,51 @@ function ensureYouTubeTab() {
       });
     });
   });
+}
+
+function requestBaseColors(done) {
+  const tabs = globalThis.chrome?.tabs;
+  if (!tabs?.query || !tabs?.sendMessage) {
+    done(null);
+    return;
+  }
+
+  let settled = false;
+  let timer = null;
+  const finish = (colors) => {
+    if (settled) return;
+    settled = true;
+    clearTimeout(timer);
+    done(colors);
+  };
+  timer = setTimeout(() => finish(null), 500);
+
+  tabs.query({ url: "*://*.youtube.com/*" }, (result) => {
+    const tab = result && (result.find((candidate) => candidate.active) || result[0]);
+    if (!tab || typeof tab.id !== "number" || typeof tab.url !== "string" || !/^https?:\/\/(?:[^/]+\.)?youtube\.com\//i.test(tab.url)) {
+      finish(null);
+      return;
+    }
+    try {
+      tabs.sendMessage(tab.id, { type: "ytc-base-colors" }, (response) => {
+        void globalThis.chrome?.runtime?.lastError;
+        finish(response?.colors || null);
+      });
+    } catch (error) {
+      finish(null);
+    }
+  });
+}
+
+function applyBaseColorFallbacks(colors) {
+  if (!colors) return;
+  for (const scope of colorScopes) {
+    const source = colors[scope.prefix];
+    if (!source) continue;
+    const complete = scope.fields.every((field) => normalizeHexColor(source[field.key]));
+    if (!complete) continue;
+    for (const field of scope.fields) field.fallback = normalizeHexColor(source[field.key]);
+  }
 }
 
 function saveSync(values) {
@@ -341,15 +375,20 @@ function applySettings(settings) {
   noRecommendedCheckbox.checked = Boolean(settings.removeRecommended);
   for (const scope of colorScopes) {
     const stored = settings[`${scope.prefix}Colors`] || {};
-    const state = colorScopeDefaults(scope);
-    state.enabled = Boolean(stored.enabled);
+    const legacy = scope.fields.every((field) => {
+      const value = normalizeHexColor(stored[field.key]);
+      return !value || value === legacyColorFallbacks.get(`${scope.prefix}:${field.key}`);
+    });
+    const state = { enabled: Boolean(stored.enabled) };
     for (const field of scope.fields) {
-      const color = normalizeHexColor(stored[field.key]) || field.fallback;
+      const storedColor = normalizeHexColor(stored[field.key]);
+      const color = legacy ? field.fallback : (storedColor || field.fallback);
       state[field.key] = color;
       setColorInputs(field.hex, field.picker, color, field.fallback);
     }
     colorState[scope.prefix] = state;
     scope.checkbox.checked = state.enabled;
+    scope.checkbox.disabled = false;
   }
   updatePageColorVisibility();
   fontSelect.value = settings.fontFamily || "";
@@ -364,9 +403,8 @@ const settingsDefaults = {
   addDislikes: true,
   removeHashtags: false,
   removeRecommended: false,
-  homeColors: colorScopeDefaults(colorScopes[0]),
-  playerColors: colorScopeDefaults(colorScopes[1]),
-  themeColors: colorScopeDefaults(colorScopes[2]),
+  homeColors: { enabled: false },
+  playerColors: { enabled: false },
   fontFamily: ""
 };
 
@@ -374,9 +412,15 @@ renderSidebarTree();
 buildColorControls();
 for (const scope of colorScopes) {
   colorState[scope.prefix] = colorScopeDefaults(scope);
+  scope.checkbox.disabled = true;
   scope.checkbox.addEventListener("change", () => {
     const state = colorState[scope.prefix];
     state.enabled = scope.checkbox.checked;
+    for (const field of scope.fields) {
+      const color = normalizeHexColor(state[field.key]) || normalizeHexColor(field.hex.value) || field.fallback;
+      state[field.key] = color;
+      setColorInputs(field.hex, field.picker, color, field.fallback);
+    }
     saveSync({ [`${scope.prefix}Colors`]: { ...state } });
     updatePageColorVisibility();
   });
@@ -389,11 +433,13 @@ if (localStore?.get) {
     sidebarItems = Array.isArray(local.sidebarTree) ? local.sidebarTree : [];
     sidebarHidden = new Set(Array.isArray(local.sidebarHidden) ? local.sidebarHidden.filter((key) => typeof key === "string") : []);
     renderSidebarTree();
-    syncStorage?.get(settingsDefaults, applySettings);
   });
-} else {
-  syncStorage?.get(settingsDefaults, applySettings);
 }
+
+requestBaseColors((colors) => {
+  applyBaseColorFallbacks(colors);
+  syncStorage?.get(settingsDefaults, applySettings);
+});
 
 globalThis.chrome?.storage?.onChanged?.addListener((changes, area) => {
   if (area !== "local") return;
@@ -550,14 +596,12 @@ function selectSubtab(tab) {
 
   const onHome = tab.dataset.category === "tab-home";
   const onPlayer = tab.dataset.category === "tab-player";
-  const onThemes = tab.dataset.category === "tab-themes";
   const hasMainOptions = onHome && tab.dataset.label === "Main";
   const hasSidebarOptions = onHome && tab.dataset.label === "Sidebar";
   const hasPlayerMainOptions = onPlayer && tab.dataset.label === "Main";
   const colorsVisible = {
     home: onHome && tab.dataset.label === "Colors",
-    player: onPlayer && tab.dataset.label === "Colors",
-    theme: onThemes && tab.dataset.label === "Colors"
+    player: onPlayer && tab.dataset.label === "Colors"
   };
   videosPerRow.hidden = !hasMainOptions;
   cornerOption.hidden = !hasMainOptions;
@@ -571,7 +615,7 @@ function selectSubtab(tab) {
   for (const scope of colorScopes) scope.option.hidden = !colorsVisible[scope.prefix];
   updatePageColorVisibility();
   panelEmpty.hidden = hasMainOptions || hasSidebarOptions || hasPlayerMainOptions ||
-    colorsVisible.home || colorsVisible.player || colorsVisible.theme;
+    colorsVisible.home || colorsVisible.player;
 }
 
 function renderSubtabs(category) {

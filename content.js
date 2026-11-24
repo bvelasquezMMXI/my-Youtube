@@ -54,7 +54,7 @@ const SUBSCRIPTIONS_REDACTED_CLASS = "ytc-subscriptions-redacted";
 const SUBSCRIPTION_HIDE_KEY = "subscriptions:hide-names";
 const GUIDE_TREE_TTL = 10 * 60 * 1000;
 const GUIDE_FETCH_BACKOFF = 60 * 1000;
-const COLOR_SCOPE_PREFIXES = ["home", "player", "theme"];
+const COLOR_SCOPE_PREFIXES = ["home", "player"];
 const COLOR_FIELDS = {
   home: {
     text: "#0f0f0f",
@@ -72,18 +72,10 @@ const COLOR_FIELDS = {
     details: "#ffffff",
     comments: "#ffffff",
     subscribe: "#cc0000",
-    subscribed: "#606060"
+    subscribeText: "#ffffff",
+    subscribed: "#606060",
+    subscribedText: "#ffffff"
   },
-  theme: {
-    text: "#0f0f0f",
-    background: "#ffffff",
-    header: "#ffffff",
-    guide: "#ffffff",
-    cards: "#ffffff",
-    recommended: "#ffffff",
-    details: "#ffffff",
-    comments: "#ffffff"
-  }
 };
 let currentVideosPerRow = DEFAULT_VIDEOS_PER_ROW;
 let currentUiRadius = DEFAULT_UI_RADIUS;
@@ -103,8 +95,7 @@ let guideFetchAttempt = 0;
 let innertubeConfigCache = null;
 const colorStates = {
   home: { enabled: false, ...COLOR_FIELDS.home },
-  player: { enabled: false, ...COLOR_FIELDS.player },
-  theme: { enabled: false, ...COLOR_FIELDS.theme }
+  player: { enabled: false, ...COLOR_FIELDS.player }
 };
 let addDislikesEnabled = false;
 let dislikeVideoId = "";
@@ -194,8 +185,138 @@ function applyPageColors(prefix) {
   }
 
   if (prefix === "player") {
-    applyColoredSubscribe(state.enabled, state.subscribe, state.subscribed);
+    applyColoredSubscribe(state.enabled, state.subscribe, state.subscribed, state.subscribeText, state.subscribedText);
   }
+}
+
+function colorLuminance(hex) {
+  const red = parseInt(hex.slice(1, 3), 16);
+  const green = parseInt(hex.slice(3, 5), 16);
+  const blue = parseInt(hex.slice(5, 7), 16);
+  return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+}
+
+function computedColorToHex(value) {
+  const text = String(value || "").trim();
+  if (text.startsWith("#")) return normalizeSubscribeColor(text, "");
+  const match = text.match(/^rgba?\(([^)]+)\)$/i);
+  if (!match) return "";
+  const parts = match[1].split(/[\s,/]+/).filter(Boolean);
+  if (parts.length < 3) return "";
+  const alpha = parts.length > 3 ? Number(parts[3]) : 1;
+  if (!(alpha > 0)) return "";
+  const channels = parts.slice(0, 3).map((part) => Math.round(Number(part)));
+  if (channels.some((channel) => !Number.isFinite(channel) || channel < 0 || channel > 255)) return "";
+  return `#${channels.map((channel) => channel.toString(16).padStart(2, "0")).join("")}`;
+}
+
+function effectiveBackgroundColor(element) {
+  let node = element;
+  while (node && node.nodeType === Node.ELEMENT_NODE) {
+    const color = computedColorToHex(getComputedStyle(node).backgroundColor);
+    if (color) return color;
+    node = node.parentElement;
+  }
+  return "";
+}
+
+function firstMatchingElement(selectors) {
+  for (const selector of selectors) {
+    const element = document.querySelector(selector);
+    if (element) return element;
+  }
+  return null;
+}
+
+// Read the colors YouTube itself uses by briefly removing this extension's
+// overrides. The removal and restore happen synchronously, so nothing paints
+// in between and the page never flickers.
+function sampleBaseColors() {
+  const root = document.documentElement;
+  const savedAttributes = {};
+  const savedProperties = [];
+
+  for (const prefix of COLOR_SCOPE_PREFIXES) {
+    const attribute = `ytc${prefix.charAt(0).toUpperCase()}${prefix.slice(1)}Colors`;
+    savedAttributes[attribute] = root.dataset[attribute];
+    if (savedAttributes[attribute] !== undefined) delete root.dataset[attribute];
+    for (const key of Object.keys(COLOR_FIELDS[prefix])) {
+      const property = `--ytc-${prefix}-${key}`;
+      savedProperties.push([property, root.style.getPropertyValue(property), root.style.getPropertyPriority(property)]);
+      root.style.removeProperty(property);
+    }
+  }
+
+  const coloredSubscribeSaved = root.dataset.ytcColoredSubscribe;
+  if (coloredSubscribeSaved !== undefined) delete root.dataset.ytcColoredSubscribe;
+  for (const property of ["--ytc-subscribe-color", "--ytc-subscribe-text", "--ytc-subscribed-color", "--ytc-subscribed-text"]) {
+    savedProperties.push([property, root.style.getPropertyValue(property), root.style.getPropertyPriority(property)]);
+    root.style.removeProperty(property);
+  }
+
+  const app = document.querySelector("ytd-app") || document.body || root;
+  const darkFallback = root.hasAttribute("dark");
+  const background = effectiveBackgroundColor(app) || (darkFallback ? "#0f0f0f" : "#ffffff");
+  const textElement = firstMatchingElement([
+    "ytd-watch-metadata #title",
+    "ytd-rich-item-renderer #video-title",
+    "ytd-rich-grid-renderer #video-title",
+    "a#video-title",
+    "ytd-mini-guide-renderer .title",
+    "ytd-guide-entry-renderer .title"
+  ]);
+  const text = computedColorToHex(textElement ? getComputedStyle(textElement).color : "") ||
+    computedColorToHex(getComputedStyle(app).color) ||
+    (darkFallback ? "#f1f1f1" : "#0f0f0f");
+
+  const dark = colorLuminance(background) < 128;
+  const header = effectiveBackgroundColor(document.querySelector("ytd-masthead")) || background;
+  const guide = effectiveBackgroundColor(firstMatchingElement(["ytd-guide-renderer", "ytd-mini-guide-renderer", "#guide-content"])) || background;
+  const cards = effectiveBackgroundColor(firstMatchingElement(["ytd-rich-item-renderer", "ytd-rich-grid-renderer", "ytd-rich-shelf-renderer"])) || background;
+  const recommended = effectiveBackgroundColor(firstMatchingElement(["#secondary", "ytd-watch-next-secondary-results-renderer"])) || background;
+  const details = effectiveBackgroundColor(firstMatchingElement(["ytd-watch-metadata", "#below"])) || background;
+  const comments = effectiveBackgroundColor(firstMatchingElement(["#comments", "ytd-comments"])) || background;
+
+  // YouTube's own subscribe button is white on dark and black on light; the
+  // subscribed state is a 10% / 5% tint that resolves to these exact values.
+  const subscribe = dark ? "#f1f1f1" : "#0f0f0f";
+  const subscribeText = dark ? "#0f0f0f" : "#ffffff";
+  const subscribed = dark ? "#272727" : "#f2f2f2";
+  const subscribedText = dark ? "#f1f1f1" : "#0f0f0f";
+
+  for (const [property, value, priority] of savedProperties) {
+    if (value) root.style.setProperty(property, value, priority);
+  }
+  for (const [attribute, value] of Object.entries(savedAttributes)) {
+    if (value !== undefined) root.dataset[attribute] = value;
+  }
+  if (coloredSubscribeSaved !== undefined) root.dataset.ytcColoredSubscribe = coloredSubscribeSaved;
+
+  return {
+    home: { text, background, header, guide, cards },
+    player: { text, background, header, guide, recommended, details, comments, subscribe, subscribeText, subscribed, subscribedText }
+  };
+}
+
+function isLegacyColorState(prefix, stored) {
+  return Object.keys(COLOR_FIELDS[prefix]).every((key) => {
+    const value = normalizeSubscribeColor(stored[key], "");
+    return !value || value === COLOR_FIELDS[prefix][key];
+  });
+}
+
+function hasMissingColorFields(prefix, stored) {
+  return Object.keys(COLOR_FIELDS[prefix]).some((key) => !normalizeSubscribeColor(stored[key], ""));
+}
+
+function buildColorState(prefix, stored, base) {
+  const legacy = isLegacyColorState(prefix, stored);
+  const state = { enabled: Boolean(stored.enabled) };
+  for (const [key, fallback] of Object.entries(COLOR_FIELDS[prefix])) {
+    const value = normalizeSubscribeColor(stored[key], "");
+    state[key] = !legacy && value ? value : (base?.[key] || value || fallback);
+  }
+  return state;
 }
 
 function syncPageKind() {
@@ -587,16 +708,18 @@ function syncSubscribeButtons() {
   }
 }
 
-function applyColoredSubscribe(value, subscribeColor, subscribedColor) {
+function applyColoredSubscribe(value, subscribeColor, subscribedColor, subscribeTextColor, subscribedTextColor) {
   coloredSubscribeEnabled = Boolean(value);
   subscribeButtonColor = normalizeSubscribeColor(subscribeColor, DEFAULT_SUBSCRIBE_COLOR);
   subscribedButtonColor = normalizeSubscribeColor(subscribedColor, DEFAULT_SUBSCRIBED_COLOR);
+  const subscribeText = normalizeSubscribeColor(subscribeTextColor, readableSubscribeText(subscribeButtonColor));
+  const subscribedText = normalizeSubscribeColor(subscribedTextColor, readableSubscribeText(subscribedButtonColor));
 
   const root = document.documentElement;
   root.style.setProperty("--ytc-subscribe-color", subscribeButtonColor);
-  root.style.setProperty("--ytc-subscribe-text", readableSubscribeText(subscribeButtonColor));
+  root.style.setProperty("--ytc-subscribe-text", subscribeText);
   root.style.setProperty("--ytc-subscribed-color", subscribedButtonColor);
-  root.style.setProperty("--ytc-subscribed-text", readableSubscribeText(subscribedButtonColor));
+  root.style.setProperty("--ytc-subscribed-text", subscribedText);
 
   if (coloredSubscribeEnabled) root.dataset.ytcColoredSubscribe = "1";
   else delete root.dataset.ytcColoredSubscribe;
@@ -1219,20 +1342,19 @@ function applySyncSettings(settings) {
   applyAddDislikes(settings.addDislikes !== false);
   applyRemoveHashtags(settings.removeHashtags);
   applyRemoveRecommended(settings.removeRecommended);
+  let sampledBase = null;
   for (const prefix of COLOR_SCOPE_PREFIXES) {
     const stored = settings[`${prefix}Colors`] || {};
-    const state = { enabled: Boolean(stored.enabled) };
-    for (const [key, fallback] of Object.entries(COLOR_FIELDS[prefix])) {
-      state[key] = normalizeSubscribeColor(stored[key], fallback);
-    }
-    colorStates[prefix] = state;
+    const needsBase = Boolean(stored.enabled) && (isLegacyColorState(prefix, stored) || hasMissingColorFields(prefix, stored));
+    if (needsBase) sampledBase ||= sampleBaseColors();
+    colorStates[prefix] = buildColorState(prefix, stored, needsBase ? sampledBase[prefix] : null);
     applyPageColors(prefix);
   }
   syncPageKind();
 }
 
 function loadSyncSettings() {
-  globalThis.chrome?.storage?.sync?.get({ videosPerRow: DEFAULT_VIDEOS_PER_ROW, uiRadius: DEFAULT_UI_RADIUS, noAI: false, hoverHighlights: true, addDislikes: true, fontFamily: "", removeHashtags: false, removeRecommended: false, homeColors: { enabled: false, ...COLOR_FIELDS.home }, playerColors: { enabled: false, ...COLOR_FIELDS.player }, themeColors: { enabled: false, ...COLOR_FIELDS.theme } }, applySyncSettings);
+  globalThis.chrome?.storage?.sync?.get({ videosPerRow: DEFAULT_VIDEOS_PER_ROW, uiRadius: DEFAULT_UI_RADIUS, noAI: false, hoverHighlights: true, addDislikes: true, fontFamily: "", removeHashtags: false, removeRecommended: false, homeColors: { enabled: false }, playerColors: { enabled: false } }, applySyncSettings);
 }
 
 loadLocalSettings();
@@ -1255,6 +1377,10 @@ window.addEventListener("pageshow", reloadSettings);
 if (!globalThis.__ytcMessageListener) {
   globalThis.__ytcMessageListener = true;
   globalThis.chrome?.runtime?.onMessage?.addListener((message, sender, sendResponse) => {
+    if (message?.type === "ytc-base-colors") {
+      sendResponse({ colors: sampleBaseColors() });
+      return false;
+    }
     if (message?.type !== "ytc-ping") return false;
     sendResponse({ ok: true });
     return false;
@@ -1271,15 +1397,14 @@ chrome.storage.onChanged.addListener((changes, area) => {
     return;
   }
   if (area !== "sync") return;
+  let sampledBase = null;
   for (const prefix of COLOR_SCOPE_PREFIXES) {
     const key = `${prefix}Colors`;
     if (!changes[key]) continue;
     const stored = changes[key].newValue || {};
-    const state = { enabled: Boolean(stored.enabled) };
-    for (const [field, fallback] of Object.entries(COLOR_FIELDS[prefix])) {
-      state[field] = normalizeSubscribeColor(stored[field], fallback);
-    }
-    colorStates[prefix] = state;
+    const needsBase = Boolean(stored.enabled) && (isLegacyColorState(prefix, stored) || hasMissingColorFields(prefix, stored));
+    if (needsBase) sampledBase ||= sampleBaseColors();
+    colorStates[prefix] = buildColorState(prefix, stored, needsBase ? sampledBase[prefix] : null);
     applyPageColors(prefix);
   }
   if (changes.videosPerRow) applyVideosPerRow(changes.videosPerRow.newValue);
