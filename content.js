@@ -45,6 +45,7 @@ const NO_RADIUS_SELECTOR = [
 const SIDEBAR_KEY_ATTR = "data-ytc-sidebar-key";
 const SIDEBAR_HIDDEN_CLASS = "ytc-sidebar-hidden";
 const SIDEBAR_TREE_STORAGE_KEY = "sidebarTree";
+const SIDEBAR_STATE_VERSION = 2;
 const SUBSCRIPTIONS_SECTION_ATTR = "data-ytc-subscriptions-section";
 const SUBSCRIPTION_NAME_ATTR = "data-ytc-subscription-name";
 const SUBSCRIPTIONS_REDACTED_CLASS = "ytc-subscriptions-redacted";
@@ -497,7 +498,8 @@ function sidebarSectionTitle(section) {
   const headers = Array.from(section.querySelectorAll("#header"));
   const header = headers.find((candidate) =>
     candidate.closest("ytd-guide-section-renderer") === section &&
-    !candidate.closest("ytd-guide-entry-renderer")
+    !candidate.closest("ytd-guide-entry-renderer") &&
+    !candidate.closest("ytd-guide-collapsible-section-entry-renderer")
   );
   if (header) return normalizeSidebarText(header.textContent);
 
@@ -554,6 +556,43 @@ function collectSidebarEntries(section, scope, usedKeys) {
   return entries;
 }
 
+function sidebarCollapsibleTitle(collapsible) {
+  const header = collapsible.querySelector(":scope > #header");
+  if (!header) return "";
+  const entry = header.matches("ytd-guide-entry-renderer") ? header : header.querySelector("ytd-guide-entry-renderer");
+  return sidebarEntryTitle(entry || header);
+}
+
+function collectCollapsibleEntries(collapsible, scope, usedKeys) {
+  const entries = [];
+  for (const entry of collapsible.querySelectorAll("ytd-guide-entry-renderer")) {
+    if (entry.closest("ytd-guide-collapsible-section-entry-renderer") !== collapsible) continue;
+    if (entry.closest("#header")) continue;
+    const title = sidebarEntryTitle(entry);
+    if (!title || /^show (?:more|less)$/i.test(title)) continue;
+
+    const href = sidebarEntryHref(entry);
+    const key = uniqueSidebarKey(usedKeys, `entry:${scope}|${href || sidebarKeyText(title)}`);
+    markSidebarElement(entry, key);
+    entries.push({ key, title, children: [] });
+  }
+  return entries;
+}
+
+function markCollapsibleSubscriptionNames(collapsible) {
+  collapsible.setAttribute(SUBSCRIPTIONS_SECTION_ATTR, "");
+  for (const entry of collapsible.querySelectorAll("ytd-guide-entry-renderer")) {
+    if (entry.closest("ytd-guide-collapsible-section-entry-renderer") !== collapsible) continue;
+    if (entry.closest("#header")) continue;
+    const title = sidebarEntryTitle(entry);
+    if (!title || /^show (?:more|less)$/i.test(title)) continue;
+    const name = entry.querySelector(".title, #label, yt-formatted-string.title") || entry;
+    if (!name.hasAttribute(SUBSCRIPTION_NAME_ATTR)) {
+      name.setAttribute(SUBSCRIPTION_NAME_ATTR, "");
+    }
+  }
+}
+
 function markSubscriptionNames(section) {
   section.setAttribute(SUBSCRIPTIONS_SECTION_ATTR, "");
   for (const entry of section.querySelectorAll("ytd-guide-entry-renderer")) {
@@ -582,6 +621,7 @@ function syncMiniGuide(tree, usedKeys) {
   if (!entries.length) return;
 
   const extra = [];
+  const referenceTree = Array.isArray(guideTreeCache) && guideTreeCache.length ? guideTreeCache : tree;
   for (const entry of entries) {
     const title = normalizeSidebarText(
       entry.querySelector(".title, #label")?.textContent || entry.getAttribute("aria-label") || entry.textContent
@@ -591,13 +631,13 @@ function syncMiniGuide(tree, usedKeys) {
     const lowerTitle = title.toLowerCase();
     let item = null;
     if (lowerTitle === "you") {
-      item = findSidebarTreeItem(tree, (candidate) => candidate.key === "section:you");
+      item = findSidebarTreeItem(referenceTree, (candidate) => candidate.key === "section:you");
     }
     if (!item && lowerTitle === "subscriptions") {
-      item = findSidebarTreeItem(tree, (candidate) => candidate.key === "section:subscriptions");
+      item = findSidebarTreeItem(referenceTree, (candidate) => candidate.key === "section:subscriptions");
     }
     if (!item) {
-      item = findSidebarTreeItem(tree, (candidate) => candidate.title.toLowerCase() === lowerTitle);
+      item = findSidebarTreeItem(referenceTree, (candidate) => candidate.title.toLowerCase() === lowerTitle);
     }
 
     const href = sidebarEntryHref(entry);
@@ -645,12 +685,15 @@ function buildSidebarTree() {
           addSidebarItem(tree, {
             key,
             title,
-            children: [{
-              key: SUBSCRIPTION_HIDE_KEY,
-              title: "Hide Subscriptions",
-              children: [],
-              inverted: true
-            }]
+            children: [
+              {
+                key: SUBSCRIPTION_HIDE_KEY,
+                title: "Hide Subscriptions",
+                children: [],
+                inverted: true
+              },
+              ...collectSidebarEntries(section, key, usedKeys)
+            ]
           });
         } else {
           section.removeAttribute(SUBSCRIPTIONS_SECTION_ATTR);
@@ -661,8 +704,47 @@ function buildSidebarTree() {
           });
         }
       } else {
-        for (const entry of collectSidebarEntries(section, "top", usedKeys)) {
-          addSidebarItem(tree, entry);
+        for (const node of section.querySelectorAll("ytd-guide-entry-renderer, ytd-guide-collapsible-section-entry-renderer")) {
+          if (node.closest("ytd-guide-section-renderer") !== section) continue;
+          if (node.matches("ytd-guide-entry-renderer") && node.closest("ytd-guide-collapsible-section-entry-renderer")) continue;
+          if (node.matches("ytd-guide-collapsible-section-entry-renderer") && node.closest("ytd-guide-collapsible-section-entry-renderer") !== node) continue;
+
+          if (node.matches("ytd-guide-collapsible-section-entry-renderer")) {
+            const title = sidebarCollapsibleTitle(node);
+            if (!title) continue;
+            const key = uniqueSidebarKey(usedKeys, `section:${sidebarKeyText(title)}`);
+            markSidebarElement(node, key);
+            if (/^subscriptions$/i.test(title)) {
+              markCollapsibleSubscriptionNames(node);
+              addSidebarItem(tree, {
+                key,
+                title,
+                children: [
+                  {
+                    key: SUBSCRIPTION_HIDE_KEY,
+                    title: "Hide Subscriptions",
+                    children: [],
+                    inverted: true
+                  },
+                  ...collectCollapsibleEntries(node, key, usedKeys)
+                ]
+              });
+            } else {
+              addSidebarItem(tree, {
+                key,
+                title,
+                children: collectCollapsibleEntries(node, key, usedKeys)
+              });
+            }
+            continue;
+          }
+
+          const title = sidebarEntryTitle(node);
+          if (!title || /^show (?:more|less)$/i.test(title)) continue;
+          const href = sidebarEntryHref(node);
+          const key = uniqueSidebarKey(usedKeys, `entry:top|${href || sidebarKeyText(title)}`);
+          markSidebarElement(node, key);
+          addSidebarItem(tree, { key, title, children: [] });
         }
       }
     }
@@ -801,8 +883,13 @@ function readInnertubeConfig() {
 
 function needsFullGuide() {
   if (location.pathname.startsWith("/embed/") || location.pathname.startsWith("/live_chat")) return false;
-  return Boolean(document.querySelector("ytd-app[mini-guide-visible]")) ||
-    !document.querySelector("ytd-guide-renderer");
+  const guide = document.querySelector("ytd-guide-renderer");
+  if (!guide || guide.hidden || !guide.offsetParent) return true;
+  const style = getComputedStyle(guide);
+  if (style.display === "none" || style.visibility === "hidden") return true;
+  const rect = guide.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return true;
+  return !guide.querySelector("ytd-guide-entry-renderer, ytd-guide-collapsible-section-entry-renderer");
 }
 
 function fetchGuideTree() {
@@ -1056,9 +1143,14 @@ for (const eventName of ["yt-navigate-finish", "yt-page-data-updated", "popstate
 
 
 function loadLocalSettings() {
-  globalThis.chrome?.storage?.local?.get({ customFonts: [], sidebarHidden: [] }, (data) => {
+  globalThis.chrome?.storage?.local?.get({ customFonts: [], sidebarHidden: [], sidebarHiddenVersion: 0 }, (data) => {
     injectCustomFonts(data.customFonts);
-    sidebarHiddenKeys = new Set(Array.isArray(data.sidebarHidden) ? data.sidebarHidden.filter((key) => typeof key === "string") : []);
+    if ((Number(data.sidebarHiddenVersion) || 0) < SIDEBAR_STATE_VERSION) {
+      sidebarHiddenKeys = new Set();
+      globalThis.chrome?.storage?.local?.set?.({ sidebarHidden: [], sidebarHiddenVersion: SIDEBAR_STATE_VERSION });
+    } else {
+      sidebarHiddenKeys = new Set(Array.isArray(data.sidebarHidden) ? data.sidebarHidden.filter((key) => typeof key === "string") : []);
+    }
     applySidebarHidden();
     syncSidebar();
   });
@@ -1100,6 +1192,13 @@ window.addEventListener("pageshow", reloadSettings);
 if (!globalThis.__ytcMessageListener) {
   globalThis.__ytcMessageListener = true;
   globalThis.chrome?.runtime?.onMessage?.addListener((message, sender, sendResponse) => {
+    if (message?.type === "ytc-apply-sidebar") {
+      const keys = Array.isArray(message.keys) ? message.keys.filter((key) => typeof key === "string") : [];
+      sidebarHiddenKeys = new Set(keys);
+      syncSidebar();
+      sendResponse({ ok: true });
+      return false;
+    }
     if (message?.type !== "ytc-ping") return false;
     sendResponse({ ok: true });
     return false;

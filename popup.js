@@ -30,6 +30,7 @@ const syncStorage = globalThis.chrome?.storage?.sync;
 const localStore = globalThis.chrome?.storage?.local;
 let sidebarItems = [];
 let sidebarHidden = new Set();
+const SIDEBAR_STATE_VERSION = 2;
 
 let lastYouTubePing = 0;
 let lastYouTubeReload = 0;
@@ -56,6 +57,40 @@ function ensureYouTubeTab() {
         void chromeApi.runtime?.lastError;
       });
     });
+  });
+}
+
+const sidebarTabReloads = new Map();
+
+function pushSidebarState(keys) {
+  const chromeApi = globalThis.chrome;
+  const tabs = chromeApi?.tabs;
+  if (!tabs?.query || !tabs?.sendMessage) return;
+
+  tabs.query({ url: "*://*.youtube.com/*" }, (result) => {
+    for (const tab of result || []) {
+      if (!tab || typeof tab.id !== "number" || tab.discarded) continue;
+      let settled = false;
+      const reloadTab = () => {
+        const now = Date.now();
+        if (now - (sidebarTabReloads.get(tab.id) || 0) < 5000) return;
+        sidebarTabReloads.set(tab.id, now);
+        tabs.reload(tab.id, () => {
+          void chromeApi.runtime?.lastError;
+        });
+      };
+      const timer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        reloadTab();
+      }, 1200);
+      tabs.sendMessage(tab.id, { type: "ytc-apply-sidebar", keys }, (response) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        if (chromeApi.runtime?.lastError || !response?.ok) reloadTab();
+      });
+    }
   });
 }
 
@@ -166,8 +201,9 @@ function renderSidebarTree() {
       } else {
         sidebarHidden.add(item.key);
       }
-      ensureYouTubeTab();
-      localStore?.set({ sidebarHidden: Array.from(sidebarHidden) });
+      const keys = Array.from(sidebarHidden);
+      localStore?.set({ sidebarHidden: keys });
+      pushSidebarState(keys);
       renderSidebarTree();
     });
     const text = document.createElement("span");
@@ -215,10 +251,15 @@ const settingsDefaults = {
 renderSidebarTree();
 
 if (localStore?.get) {
-  localStore.get({ customFonts: [], sidebarTree: [], sidebarHidden: [] }, (local) => {
+  localStore.get({ customFonts: [], sidebarTree: [], sidebarHidden: [], sidebarHiddenVersion: 0 }, (local) => {
     appendCustomFonts(local.customFonts);
     sidebarItems = Array.isArray(local.sidebarTree) ? local.sidebarTree : [];
-    sidebarHidden = new Set(Array.isArray(local.sidebarHidden) ? local.sidebarHidden.filter((key) => typeof key === "string") : []);
+    if ((Number(local.sidebarHiddenVersion) || 0) < SIDEBAR_STATE_VERSION) {
+      sidebarHidden = new Set();
+      localStore?.set({ sidebarHidden: [], sidebarHiddenVersion: SIDEBAR_STATE_VERSION });
+    } else {
+      sidebarHidden = new Set(Array.isArray(local.sidebarHidden) ? local.sidebarHidden.filter((key) => typeof key === "string") : []);
+    }
     renderSidebarTree();
   });
 }
@@ -393,6 +434,7 @@ function selectSubtab(tab) {
   removeHashtagsOption.hidden = !hasPlayerMainOptions;
   noRecommendedOption.hidden = !hasPlayerMainOptions;
   panelEmpty.hidden = hasMainOptions || hasSidebarOptions || hasPlayerMainOptions;
+  if (hasSidebarOptions) renderSidebarTree();
 }
 
 function renderSubtabs(category) {
