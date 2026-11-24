@@ -34,18 +34,6 @@ hashtags** strips hashtags from video titles and descriptions on watch pages,
 cards, and Shorts, and hides hashtag links; turning it off restores the
 original text. **Remove recommended videos** hides the watch page's right
 column and expands the player, description, and comments to the full width.
-**Home** and **Player** each have a **Colors** subtab with one **Custom colors**
-checkbox and individual color rows for Text, Button text, Background, Header,
-Guide, and the page's major elements: Cards, Search bar, Search bar text,
-Categories, Category options, Selected category, Next/back buttons, Create
-button, and Create button text on Home; Recommended, Video details,
-Description, Comments, and the Subscribe button's background and text for each
-state on Player. Home colors apply only on the Home feed and Player colors only
-on watch pages. Each row starts at the page's current, unmodified color, so
-enabling the checkbox changes nothing until a value is edited.
-**Themes** has **Default** and **Midnight Black** presets with their palettes
-shown as swatches and an **Apply** button, plus **Save theme** and **Load theme**
-buttons for storing and restoring the current color setup.
 
 ## Load unpacked
 

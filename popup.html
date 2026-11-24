@@ -16,14 +16,6 @@
 
   <main>
     <section class="panel" id="panel" role="tabpanel">
-      <div class="theme-view" id="theme-view" hidden>
-        <div id="theme-presets"></div>
-        <div class="theme-actions">
-          <button class="theme-action" id="theme-save" type="button" disabled>Save theme</button>
-          <button class="theme-action" id="theme-load" type="button" disabled>Load theme</button>
-          <span class="theme-status" id="theme-status"></span>
-        </div>
-      </div>
       <p class="empty" id="panel-empty"></p>
       <div class="option" id="videos-per-row" hidden>
         <label class="option-label" for="videos-per-row-number">Videos per row</label>
@@ -86,26 +78,12 @@
           <span>Remove recommended videos</span>
         </label>
       </div>
-      <div class="option option-toggle" id="home-colors" hidden>
-        <label class="option-label" for="home-colors-checkbox">
-          <input class="option-check" id="home-colors-checkbox" type="checkbox">
-          <span>Custom colors</span>
-        </label>
-      </div>
-      <div class="color-suboptions" id="home-color-options" hidden></div>
-      <div class="option option-toggle" id="player-colors" hidden>
-        <label class="option-label" for="player-colors-checkbox">
-          <input class="option-check" id="player-colors-checkbox" type="checkbox">
-          <span>Custom colors</span>
-        </label>
-      </div>
-      <div class="color-suboptions" id="player-color-options" hidden></div>
     </section>
   </main>
 
   <aside class="sidebar" role="tablist" aria-orientation="vertical" aria-label="Modification categories">
-    <button class="tab" id="tab-home" type="button" role="tab" aria-controls="panel" data-subtabs="Main|Sidebar|Colors" aria-selected="true">Home</button>
-    <button class="tab" id="tab-player" type="button" role="tab" aria-controls="panel" data-subtabs="Main|Colors" aria-selected="false">Player</button>
+    <button class="tab" id="tab-home" type="button" role="tab" aria-controls="panel" data-subtabs="Main|Sidebar" aria-selected="true">Home</button>
+    <button class="tab" id="tab-player" type="button" role="tab" aria-controls="panel" data-subtabs="Main" aria-selected="false">Player</button>
     <button class="tab" id="tab-themes" type="button" role="tab" aria-controls="panel" aria-selected="false">Themes</button>
   </aside>
 

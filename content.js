@@ -29,10 +29,7 @@ const DISLIKE_ARIA_ATTR = "data-ytc-dislike-aria";
 const DISLIKE_STYLE_ATTR = "data-ytc-dislike-style";
 const DISLIKE_MESSAGE_TYPE = "ytc-get-dislikes";
 const DISLIKE_HOST_SELECTOR = "segmented-like-dislike-button-view-model, ytd-segmented-like-dislike-button-renderer";
-const SUBSCRIBE_RENDERER_SELECTOR = "ytd-subscribe-button-renderer, yt-subscribe-button-view-model";
-const SUBSCRIBE_STATE_ATTR = "data-ytc-subscribed";
-const DEFAULT_SUBSCRIBE_COLOR = "#cc0000";
-const DEFAULT_SUBSCRIBED_COLOR = "#606060";
+
 const NO_RADIUS_ATTR = "data-ytc-no-radius";
 const NO_RADIUS_SELECTOR = [
   ".ytp-progress-bar-container",
@@ -54,40 +51,8 @@ const SUBSCRIPTIONS_REDACTED_CLASS = "ytc-subscriptions-redacted";
 const SUBSCRIPTION_HIDE_KEY = "subscriptions:hide-names";
 const GUIDE_TREE_TTL = 10 * 60 * 1000;
 const GUIDE_FETCH_BACKOFF = 60 * 1000;
-const COLOR_SCOPE_PREFIXES = ["home", "player"];
-const COLOR_FIELDS = {
-  home: {
-    text: "#0f0f0f",
-    buttonText: "#0f0f0f",
-    background: "#ffffff",
-    header: "#ffffff",
-    guide: "#ffffff",
-    cards: "#ffffff",
-    search: "#ffffff",
-    searchText: "#0f0f0f",
-    categories: "#ffffff",
-    categoryOptions: "#f2f2f2",
-    selectedCategory: "#0f0f0f",
-    categoryArrows: "#ffffff",
-    createButton: "#ffffff",
-    createButtonText: "#0f0f0f"
-  },
-  player: {
-    text: "#0f0f0f",
-    buttonText: "#0f0f0f",
-    background: "#ffffff",
-    header: "#ffffff",
-    guide: "#ffffff",
-    recommended: "#ffffff",
-    details: "#ffffff",
-    description: "#f2f2f2",
-    comments: "#ffffff",
-    subscribe: "#cc0000",
-    subscribeText: "#ffffff",
-    subscribed: "#606060",
-    subscribedText: "#ffffff"
-  },
-};
+
+
 let currentVideosPerRow = DEFAULT_VIDEOS_PER_ROW;
 let currentUiRadius = DEFAULT_UI_RADIUS;
 let currentHoverHighlights = true;
@@ -104,18 +69,12 @@ let guideTreeCacheTime = 0;
 let guideFetchPending = false;
 let guideFetchAttempt = 0;
 let innertubeConfigCache = null;
-const colorStates = {
-  home: { enabled: false, ...COLOR_FIELDS.home },
-  player: { enabled: false, ...COLOR_FIELDS.player }
-};
+
 let addDislikesEnabled = false;
 let dislikeVideoId = "";
 let dislikeCount = null;
 let pendingDislikeVideoId = "";
 let dislikeRequestToken = 0;
-let coloredSubscribeEnabled = false;
-let subscribeButtonColor = DEFAULT_SUBSCRIBE_COLOR;
-let subscribedButtonColor = DEFAULT_SUBSCRIBED_COLOR;
 
 function injectCustomFonts(fonts) {
   const styleId = "ytc-custom-fonts";
@@ -176,236 +135,6 @@ function applyRemoveRecommended(value) {
 
   // The player only recomputes its video size on a resize.
   if (changed) window.dispatchEvent(new Event("resize"));
-}
-
-function colorVariable(prefix, key) {
-  return `--ytc-${prefix}-${key.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}`;
-}
-
-function applyPageColors(prefix) {
-  const root = document.documentElement;
-  const state = colorStates[prefix];
-  const attr = `ytc${prefix.charAt(0).toUpperCase()}${prefix.slice(1)}Colors`;
-
-  if (state.enabled) {
-    root.dataset[attr] = "1";
-    for (const [key, fallback] of Object.entries(COLOR_FIELDS[prefix])) {
-      root.style.setProperty(colorVariable(prefix, key), state[key] || fallback);
-    }
-  } else {
-    delete root.dataset[attr];
-    for (const key of Object.keys(COLOR_FIELDS[prefix])) {
-      root.style.removeProperty(colorVariable(prefix, key));
-    }
-  }
-
-  if (prefix === "home") {
-    if (state.enabled) {
-      const optionsColor = normalizeSubscribeColor(state.categoryOptions, COLOR_FIELDS.home.categoryOptions);
-      const selectedColor = normalizeSubscribeColor(state.selectedCategory, COLOR_FIELDS.home.selectedCategory);
-      root.style.setProperty("--ytc-home-category-options-text", readableSubscribeText(optionsColor));
-      root.style.setProperty("--ytc-home-selected-category-text", readableSubscribeText(selectedColor));
-    } else {
-      root.style.removeProperty("--ytc-home-category-options-text");
-      root.style.removeProperty("--ytc-home-selected-category-text");
-    }
-  }
-
-  if (prefix === "player") {
-    applyColoredSubscribe(state.enabled, state.subscribe, state.subscribed, state.subscribeText, state.subscribedText);
-  }
-}
-
-function colorLuminance(hex) {
-  const red = parseInt(hex.slice(1, 3), 16);
-  const green = parseInt(hex.slice(3, 5), 16);
-  const blue = parseInt(hex.slice(5, 7), 16);
-  return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
-}
-
-function computedColorToHex(value) {
-  const text = String(value || "").trim();
-  if (text.startsWith("#")) return normalizeSubscribeColor(text, "");
-  const match = text.match(/^rgba?\(([^)]+)\)$/i);
-  if (!match) return "";
-  const parts = match[1].split(/[\s,/]+/).filter(Boolean);
-  if (parts.length < 3) return "";
-  const alpha = parts.length > 3 ? Number(parts[3]) : 1;
-  if (!(alpha > 0)) return "";
-  const channels = parts.slice(0, 3).map((part) => Math.round(Number(part)));
-  if (channels.some((channel) => !Number.isFinite(channel) || channel < 0 || channel > 255)) return "";
-  return `#${channels.map((channel) => channel.toString(16).padStart(2, "0")).join("")}`;
-}
-
-function effectiveBackgroundColor(element) {
-  let node = element;
-  while (node && node.nodeType === Node.ELEMENT_NODE) {
-    const color = computedColorToHex(getComputedStyle(node).backgroundColor);
-    if (color) return color;
-    node = node.parentElement;
-  }
-  return "";
-}
-
-function firstMatchingElement(selectors) {
-  for (const selector of selectors) {
-    const element = document.querySelector(selector);
-    if (element) return element;
-  }
-  return null;
-}
-
-// Read the colors YouTube itself uses by briefly removing this extension's
-// overrides. The removal and restore happen synchronously, so nothing paints
-// in between and the page never flickers.
-function sampleBaseColors() {
-  const root = document.documentElement;
-  const savedAttributes = {};
-  const savedProperties = [];
-
-  for (const prefix of COLOR_SCOPE_PREFIXES) {
-    const attribute = `ytc${prefix.charAt(0).toUpperCase()}${prefix.slice(1)}Colors`;
-    savedAttributes[attribute] = root.dataset[attribute];
-    if (savedAttributes[attribute] !== undefined) delete root.dataset[attribute];
-    for (const key of Object.keys(COLOR_FIELDS[prefix])) {
-      const property = colorVariable(prefix, key);
-      savedProperties.push([property, root.style.getPropertyValue(property), root.style.getPropertyPriority(property)]);
-      root.style.removeProperty(property);
-    }
-  }
-
-  const coloredSubscribeSaved = root.dataset.ytcColoredSubscribe;
-  if (coloredSubscribeSaved !== undefined) delete root.dataset.ytcColoredSubscribe;
-  for (const property of ["--ytc-home-category-options-text", "--ytc-home-selected-category-text", "--ytc-subscribe-color", "--ytc-subscribe-text", "--ytc-subscribed-color", "--ytc-subscribed-text"]) {
-    savedProperties.push([property, root.style.getPropertyValue(property), root.style.getPropertyPriority(property)]);
-    root.style.removeProperty(property);
-  }
-
-  const app = document.querySelector("ytd-app") || document.body || root;
-  const darkFallback = root.hasAttribute("dark");
-  const background = effectiveBackgroundColor(app) || (darkFallback ? "#0f0f0f" : "#ffffff");
-  const textElement = firstMatchingElement([
-    "ytd-watch-metadata #title",
-    "ytd-rich-item-renderer #video-title",
-    "ytd-rich-grid-renderer #video-title",
-    "a#video-title",
-    "ytd-mini-guide-renderer .title",
-    "ytd-guide-entry-renderer .title"
-  ]);
-  const text = computedColorToHex(textElement ? getComputedStyle(textElement).color : "") ||
-    computedColorToHex(getComputedStyle(app).color) ||
-    (darkFallback ? "#f1f1f1" : "#0f0f0f");
-
-  const dark = colorLuminance(background) < 128;
-  const header = effectiveBackgroundColor(document.querySelector("ytd-masthead")) || background;
-  const guide = effectiveBackgroundColor(firstMatchingElement(["ytd-guide-renderer", "ytd-mini-guide-renderer", "#guide-content"])) || background;
-  const cards = effectiveBackgroundColor(firstMatchingElement(["ytd-rich-item-renderer", "ytd-rich-grid-renderer", "ytd-rich-shelf-renderer"])) || background;
-  const search = effectiveBackgroundColor(firstMatchingElement([
-    "yt-searchbox .ytSearchboxComponentInputBox",
-    "ytd-searchbox",
-    "ytd-masthead #search-form",
-    "#search-form"
-  ])) || background;
-  const searchTextElement = firstMatchingElement([
-    "yt-searchbox input.ytSearchboxComponentInput",
-    "ytd-searchbox input#search",
-    "ytd-masthead #search input",
-    "ytd-masthead input#search"
-  ]);
-  const searchText = computedColorToHex(searchTextElement ? getComputedStyle(searchTextElement).color : "") || text;
-  const categories = effectiveBackgroundColor(firstMatchingElement([
-    "ytd-feed-filter-chip-bar-renderer",
-    "yt-chip-cloud-renderer",
-    "#chips-wrapper",
-    "#chip-bar"
-  ])) || background;
-  const categoryOptions = dark ? "#272727" : "#f2f2f2";
-  const selectedCategory = effectiveBackgroundColor(firstMatchingElement([
-    "yt-chip-cloud-chip-renderer[selected] .ytChipShapeChip",
-    "yt-chip-cloud-chip-renderer.iron-selected .ytChipShapeChip"
-  ])) || (dark ? "#f1f1f1" : "#0f0f0f");
-  const categoryArrows = effectiveBackgroundColor(firstMatchingElement([
-    "#right-arrow-button button",
-    "#left-arrow-button button",
-    "#right-arrow-button",
-    "#left-arrow-button"
-  ])) || background;
-  const createButtonElement = firstMatchingElement([
-    "ytd-masthead ytd-button-renderer.ytd-masthead:has(yt-icon)",
-    "ytd-masthead ytd-button-renderer.ytd-masthead:has(yt-icon) button",
-    "ytd-masthead ytd-button-renderer.ytd-masthead:has(yt-icon) a",
-    "ytd-masthead ytd-button-renderer.ytd-masthead:has(yt-icon) yt-icon-button",
-    "ytd-masthead #buttons button:has(#create)",
-    "ytd-masthead #buttons ytd-topbar-menu-button-renderer:has(#create)",
-    "ytd-masthead #buttons button[aria-label='Create']",
-    "ytd-masthead #buttons ytd-topbar-menu-button-renderer:has(button[aria-label='Create'])",
-    "#create-button",
-    "#create-button button"
-  ]);
-  const createButton = effectiveBackgroundColor(createButtonElement) || background;
-  const createButtonText = computedColorToHex(createButtonElement ? getComputedStyle(createButtonElement).color : "") || text;
-  const recommended = effectiveBackgroundColor(firstMatchingElement(["#secondary", "ytd-watch-next-secondary-results-renderer"])) || background;
-  const details = effectiveBackgroundColor(firstMatchingElement(["ytd-watch-metadata", "#below"])) || background;
-  const description = "#f2f2f2";
-  const comments = effectiveBackgroundColor(firstMatchingElement(["#comments", "ytd-comments"])) || background;
-
-  // YouTube's own subscribe button is white on dark and black on light; the
-  // subscribed state is a 10% / 5% tint that resolves to these exact values.
-  const subscribe = dark ? "#f1f1f1" : "#0f0f0f";
-  const subscribeText = dark ? "#0f0f0f" : "#ffffff";
-  const subscribed = dark ? "#272727" : "#f2f2f2";
-  const subscribedText = dark ? "#f1f1f1" : "#0f0f0f";
-
-  for (const [property, value, priority] of savedProperties) {
-    if (value) root.style.setProperty(property, value, priority);
-  }
-  for (const [attribute, value] of Object.entries(savedAttributes)) {
-    if (value !== undefined) root.dataset[attribute] = value;
-  }
-  if (coloredSubscribeSaved !== undefined) root.dataset.ytcColoredSubscribe = coloredSubscribeSaved;
-
-  return {
-    home: { text, buttonText: text, background, header, guide, cards, search, searchText, categories, categoryOptions, selectedCategory, categoryArrows, createButton, createButtonText },
-    player: { text, buttonText: text, background, header, guide, recommended, details, description, comments, subscribe, subscribeText, subscribed, subscribedText }
-  };
-}
-
-function isLegacyDescriptionColor(value) {
-  return value === "#ffffff" || value === "#0f0f0f";
-}
-
-function isLegacyColorState(prefix, stored) {
-  return Object.keys(COLOR_FIELDS[prefix]).every((key) => {
-    const value = normalizeSubscribeColor(stored[key], "");
-    if (!value || value === COLOR_FIELDS[prefix][key]) return true;
-    return prefix === "player" && key === "description" && isLegacyDescriptionColor(value);
-  });
-}
-
-function hasMissingColorFields(prefix, stored) {
-  return Object.keys(COLOR_FIELDS[prefix]).some((key) => !normalizeSubscribeColor(stored[key], ""));
-}
-
-function buildColorState(prefix, stored, base) {
-  const legacy = isLegacyColorState(prefix, stored);
-  const state = { enabled: Boolean(stored.enabled) };
-  for (const [key, fallback] of Object.entries(COLOR_FIELDS[prefix])) {
-    const value = normalizeSubscribeColor(stored[key], "");
-    const migrate = prefix === "player" && key === "description" && isLegacyDescriptionColor(value);
-    state[key] = !legacy && value && !migrate ? value : (base?.[key] || fallback);
-  }
-  return state;
-}
-
-function syncPageKind() {
-  const root = document.documentElement;
-  if (location.pathname === "/watch") {
-    root.dataset.ytcPage = "watch";
-  } else if (location.pathname === "/") {
-    root.dataset.ytcPage = "home";
-  } else {
-    delete root.dataset.ytcPage;
-  }
 }
 
 function markNoRadiusElements() {
@@ -741,68 +470,6 @@ function applyAddDislikes(value) {
     return;
   }
   syncDislikes();
-}
-
-function normalizeSubscribeColor(value, fallback) {
-  const text = String(value || "").trim().replace(/^#/, "");
-  if (/^[0-9a-f]{3}$/i.test(text)) {
-    return `#${text.split("").map((part) => part + part).join("")}`.toLowerCase();
-  }
-  if (/^[0-9a-f]{6}$/i.test(text)) return `#${text}`.toLowerCase();
-  return fallback;
-}
-
-function readableSubscribeText(color) {
-  const red = parseInt(color.slice(1, 3), 16);
-  const green = parseInt(color.slice(3, 5), 16);
-  const blue = parseInt(color.slice(5, 7), 16);
-  const luminance = 0.2126 * red + 0.7152 * green + 0.0722 * blue;
-  return luminance > 140 ? "#0f0f0f" : "#f1f1f1";
-}
-
-function isSubscribeButtonSubscribed(renderer) {
-  const subscribed = renderer.getAttribute("subscribed");
-  if (subscribed !== null) return subscribed !== "false";
-
-  const button = renderer.querySelector("button");
-  if (button) {
-    if (button.getAttribute("aria-pressed") === "true") return true;
-    const aria = (button.getAttribute("aria-label") || "").toLowerCase();
-    if (aria.includes("unsubscribe") || aria.includes("subscribed")) return true;
-    const text = (button.innerText || "").trim().toLowerCase();
-    if (text === "subscribed" || text === "unsubscribe") return true;
-    if (text === "subscribe") return false;
-    if (aria.includes("subscribe")) return false;
-  }
-  return false;
-}
-
-function syncSubscribeButtons() {
-  for (const renderer of document.querySelectorAll(SUBSCRIBE_RENDERER_SELECTOR)) {
-    const state = isSubscribeButtonSubscribed(renderer) ? "true" : "false";
-    if (renderer.getAttribute(SUBSCRIBE_STATE_ATTR) !== state) {
-      renderer.setAttribute(SUBSCRIBE_STATE_ATTR, state);
-    }
-  }
-}
-
-function applyColoredSubscribe(value, subscribeColor, subscribedColor, subscribeTextColor, subscribedTextColor) {
-  coloredSubscribeEnabled = Boolean(value);
-  subscribeButtonColor = normalizeSubscribeColor(subscribeColor, DEFAULT_SUBSCRIBE_COLOR);
-  subscribedButtonColor = normalizeSubscribeColor(subscribedColor, DEFAULT_SUBSCRIBED_COLOR);
-  const subscribeText = normalizeSubscribeColor(subscribeTextColor, readableSubscribeText(subscribeButtonColor));
-  const subscribedText = normalizeSubscribeColor(subscribedTextColor, readableSubscribeText(subscribedButtonColor));
-
-  const root = document.documentElement;
-  root.style.setProperty("--ytc-subscribe-color", subscribeButtonColor);
-  root.style.setProperty("--ytc-subscribe-text", subscribeText);
-  root.style.setProperty("--ytc-subscribed-color", subscribedButtonColor);
-  root.style.setProperty("--ytc-subscribed-text", subscribedText);
-
-  if (coloredSubscribeEnabled) root.dataset.ytcColoredSubscribe = "1";
-  else delete root.dataset.ytcColoredSubscribe;
-
-  syncSubscribeButtons();
 }
 
 function normalizeSidebarText(value) {
@@ -1339,9 +1006,7 @@ function scheduleItemSync() {
     markNoRadiusElements();
     syncSidebar();
     syncDislikes();
-    syncSubscribeButtons();
     applyRemoveHashtags(removeHashtagsEnabled);
-    syncPageKind();
   }, 300);
 }
 
@@ -1351,9 +1016,7 @@ if (document.documentElement) {
     scheduleItemSync();
   }).observe(document.documentElement, {
     childList: true,
-    subtree: true,
-    attributes: true,
-    attributeFilter: ["subscribed", "aria-pressed"]
+    subtree: true
   });
 }
 
@@ -1386,20 +1049,11 @@ for (const eventName of ["yt-navigate-finish", "yt-page-data-updated", "popstate
     applyNoAI(noAISetting);
     syncSidebar();
     syncDislikes();
-    syncSubscribeButtons();
     applyRemoveHashtags(removeHashtagsEnabled);
-    syncPageKind();
     if (removeRecommendedEnabled) window.dispatchEvent(new Event("resize"));
   });
 }
 
-document.addEventListener("click", (event) => {
-  const target = event.target instanceof Element ? event.target : null;
-  if (!target?.closest(SUBSCRIBE_RENDERER_SELECTOR)) return;
-  setTimeout(syncSubscribeButtons, 100);
-  setTimeout(syncSubscribeButtons, 700);
-  setTimeout(syncSubscribeButtons, 1500);
-}, true);
 
 function loadLocalSettings() {
   globalThis.chrome?.storage?.local?.get({ customFonts: [], sidebarHidden: [] }, (data) => {
@@ -1420,19 +1074,10 @@ function applySyncSettings(settings) {
   applyAddDislikes(settings.addDislikes !== false);
   applyRemoveHashtags(settings.removeHashtags);
   applyRemoveRecommended(settings.removeRecommended);
-  let sampledBase = null;
-  for (const prefix of COLOR_SCOPE_PREFIXES) {
-    const stored = settings[`${prefix}Colors`] || {};
-    const needsBase = Boolean(stored.enabled) && (isLegacyColorState(prefix, stored) || hasMissingColorFields(prefix, stored));
-    if (needsBase) sampledBase ||= sampleBaseColors();
-    colorStates[prefix] = buildColorState(prefix, stored, needsBase ? sampledBase[prefix] : null);
-    applyPageColors(prefix);
-  }
-  syncPageKind();
 }
 
 function loadSyncSettings() {
-  globalThis.chrome?.storage?.sync?.get({ videosPerRow: DEFAULT_VIDEOS_PER_ROW, uiRadius: DEFAULT_UI_RADIUS, noAI: false, hoverHighlights: true, addDislikes: true, fontFamily: "", removeHashtags: false, removeRecommended: false, homeColors: { enabled: false }, playerColors: { enabled: false } }, applySyncSettings);
+  globalThis.chrome?.storage?.sync?.get({ videosPerRow: DEFAULT_VIDEOS_PER_ROW, uiRadius: DEFAULT_UI_RADIUS, noAI: false, hoverHighlights: true, addDislikes: true, fontFamily: "", removeHashtags: false, removeRecommended: false }, applySyncSettings);
 }
 
 loadLocalSettings();
@@ -1455,10 +1100,6 @@ window.addEventListener("pageshow", reloadSettings);
 if (!globalThis.__ytcMessageListener) {
   globalThis.__ytcMessageListener = true;
   globalThis.chrome?.runtime?.onMessage?.addListener((message, sender, sendResponse) => {
-    if (message?.type === "ytc-base-colors") {
-      sendResponse({ colors: sampleBaseColors() });
-      return false;
-    }
     if (message?.type !== "ytc-ping") return false;
     sendResponse({ ok: true });
     return false;
@@ -1475,16 +1116,6 @@ chrome.storage.onChanged.addListener((changes, area) => {
     return;
   }
   if (area !== "sync") return;
-  let sampledBase = null;
-  for (const prefix of COLOR_SCOPE_PREFIXES) {
-    const key = `${prefix}Colors`;
-    if (!changes[key]) continue;
-    const stored = changes[key].newValue || {};
-    const needsBase = Boolean(stored.enabled) && (isLegacyColorState(prefix, stored) || hasMissingColorFields(prefix, stored));
-    if (needsBase) sampledBase ||= sampleBaseColors();
-    colorStates[prefix] = buildColorState(prefix, stored, needsBase ? sampledBase[prefix] : null);
-    applyPageColors(prefix);
-  }
   if (changes.videosPerRow) applyVideosPerRow(changes.videosPerRow.newValue);
   if (changes.uiRadius) applyUiRadius(changes.uiRadius.newValue);
   if (changes.hoverHighlights) applyHoverHighlights(changes.hoverHighlights.newValue);

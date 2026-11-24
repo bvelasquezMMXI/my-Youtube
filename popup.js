@@ -25,299 +25,11 @@ const removeHashtagsOption = document.getElementById("remove-hashtags");
 const removeHashtagsCheckbox = document.getElementById("remove-hashtags-checkbox");
 const noRecommendedOption = document.getElementById("no-recommended");
 const noRecommendedCheckbox = document.getElementById("no-recommended-checkbox");
-const colorScopes = [
-  {
-    prefix: "home",
-    label: "Home",
-    option: document.getElementById("home-colors"),
-    checkbox: document.getElementById("home-colors-checkbox"),
-    suboptions: document.getElementById("home-color-options"),
-    fields: [
-      { key: "text", label: "Text", fallback: "#0f0f0f" },
-      { key: "buttonText", label: "Button text", fallback: "#0f0f0f" },
-      { key: "background", label: "Background", fallback: "#ffffff" },
-      { key: "header", label: "Header", fallback: "#ffffff" },
-      { key: "guide", label: "Guide", fallback: "#ffffff" },
-      { key: "cards", label: "Cards", fallback: "#ffffff" },
-      { key: "search", label: "Search bar", fallback: "#ffffff" },
-      { key: "searchText", label: "Search bar text", fallback: "#0f0f0f" },
-      { key: "categories", label: "Categories", fallback: "#ffffff" },
-      { key: "categoryOptions", label: "Category options", fallback: "#f2f2f2" },
-      { key: "selectedCategory", label: "Selected category", fallback: "#0f0f0f" },
-      { key: "categoryArrows", label: "Next/back buttons", fallback: "#ffffff" },
-      { key: "createButton", label: "Create button", fallback: "#ffffff" },
-      { key: "createButtonText", label: "Create button text", fallback: "#0f0f0f" }
-    ]
-  },
-  {
-    prefix: "player",
-    label: "Player",
-    option: document.getElementById("player-colors"),
-    checkbox: document.getElementById("player-colors-checkbox"),
-    suboptions: document.getElementById("player-color-options"),
-    fields: [
-      { key: "text", label: "Text", fallback: "#0f0f0f" },
-      { key: "buttonText", label: "Button text", fallback: "#0f0f0f" },
-      { key: "background", label: "Background", fallback: "#ffffff" },
-      { key: "header", label: "Header", fallback: "#ffffff" },
-      { key: "guide", label: "Guide", fallback: "#ffffff" },
-      { key: "recommended", label: "Recommended", fallback: "#ffffff" },
-      { key: "details", label: "Video details", fallback: "#ffffff" },
-      { key: "description", label: "Description", fallback: "#f2f2f2" },
-      { key: "comments", label: "Comments", fallback: "#ffffff" },
-      { key: "subscribe", label: "Subscribe (not subscribed)", fallback: "#cc0000" },
-      { key: "subscribeText", label: "Subscribe text (not subscribed)", fallback: "#ffffff" },
-      { key: "subscribed", label: "Subscribe (subscribed)", fallback: "#606060" },
-      { key: "subscribedText", label: "Subscribe text (subscribed)", fallback: "#ffffff" }
-    ]
-  }
-];
-const themePresets = [
-  {
-    name: "Default",
-    default: true
-  },
-  {
-    name: "Midnight Black",
-    home: {
-      text: "#e6dff2",
-      buttonText: "#e6dff2",
-      background: "#151020",
-      header: "#1b1429",
-      guide: "#1b1429",
-      cards: "#211a33",
-      search: "#2a2140",
-      searchText: "#e6dff2",
-      categories: "#1b1429",
-      categoryOptions: "#2a2140",
-      selectedCategory: "#7c5cbf",
-      categoryArrows: "#1b1429",
-      createButton: "#2a2140",
-      createButtonText: "#e6dff2"
-    },
-    player: {
-      text: "#e6dff2",
-      buttonText: "#e6dff2",
-      background: "#151020",
-      header: "#1b1429",
-      guide: "#1b1429",
-      recommended: "#1b1429",
-      details: "#1b1429",
-      description: "#2a2140",
-      comments: "#1b1429",
-      subscribe: "#7c5cbf",
-      subscribeText: "#f7f2ff",
-      subscribed: "#2a2140",
-      subscribedText: "#e6dff2"
-    }
-  }
-];
-const themeView = document.getElementById("theme-view");
-const themePresetsContainer = document.getElementById("theme-presets");
-const themeSaveButton = document.getElementById("theme-save");
-const themeLoadButton = document.getElementById("theme-load");
-const themeStatus = document.getElementById("theme-status");
-let savedTheme = null;
-let settingsReady = false;
+
 const syncStorage = globalThis.chrome?.storage?.sync;
 const localStore = globalThis.chrome?.storage?.local;
-const legacyColorFallbacks = new Map();
-for (const scope of colorScopes) {
-  for (const field of scope.fields) legacyColorFallbacks.set(`${scope.prefix}:${field.key}`, field.fallback);
-}
 let sidebarItems = [];
 let sidebarHidden = new Set();
-const colorState = {};
-
-function colorScopeDefaults(scope) {
-  const defaults = { enabled: false };
-  for (const field of scope.fields) defaults[field.key] = field.fallback;
-  return defaults;
-}
-
-function buildColorControls() {
-  for (const scope of colorScopes) {
-    for (const field of scope.fields) {
-      const id = `${scope.prefix}-${field.key}-color`;
-      const row = document.createElement("div");
-      row.className = "option option-color";
-
-      const label = document.createElement("label");
-      label.className = "option-label";
-      label.htmlFor = `${id}-hex`;
-      label.textContent = field.label;
-
-      const hex = document.createElement("input");
-      hex.className = "option-hex";
-      hex.id = `${id}-hex`;
-      hex.type = "text";
-      hex.value = field.fallback;
-      hex.maxLength = 7;
-      hex.spellcheck = false;
-      hex.setAttribute("aria-label", `${scope.label} ${field.label} color`);
-
-      const picker = document.createElement("input");
-      picker.className = "option-swatch";
-      picker.id = `${id}-picker`;
-      picker.type = "color";
-      picker.value = field.fallback;
-      picker.setAttribute("aria-label", `${scope.label} ${field.label} color picker`);
-
-      row.append(label, hex, picker);
-      scope.suboptions.append(row);
-      field.hex = hex;
-      field.picker = picker;
-    }
-  }
-}
-
-function buildPresetTheme(preset) {
-  const theme = {};
-  for (const scope of colorScopes) {
-    const source = preset[scope.prefix];
-    theme[scope.prefix] = { enabled: true };
-    for (const field of scope.fields) {
-      const color = preset.default ? field.fallback : normalizeHexColor(source?.[field.key]);
-      theme[scope.prefix][field.key] = color || field.fallback;
-    }
-  }
-  return theme;
-}
-
-function renderThemePresets() {
-  themePresetsContainer.replaceChildren();
-  for (const preset of themePresets) {
-    const presetTheme = buildPresetTheme(preset);
-    const card = document.createElement("div");
-    card.className = "theme-preset";
-
-    const name = document.createElement("div");
-    name.className = "theme-preset-name";
-    name.textContent = preset.name;
-
-    const row = document.createElement("div");
-    row.className = "theme-preset-row";
-
-    const colors = document.createElement("div");
-    colors.className = "theme-preset-colors";
-    const entries = new Map();
-    for (const scope of colorScopes) {
-      const source = presetTheme[scope.prefix];
-      for (const field of scope.fields) {
-        const color = normalizeHexColor(source[field.key]);
-        if (!color) continue;
-        if (!entries.has(color)) entries.set(color, []);
-        const labels = entries.get(color);
-        if (!labels.includes(field.label)) labels.push(field.label);
-      }
-    }
-    for (const [color, labels] of entries) {
-      const swatch = document.createElement("span");
-      swatch.className = "theme-swatch";
-      swatch.title = `${color} — ${labels.join(", ")}`;
-      swatch.setAttribute("aria-label", swatch.title);
-      const chip = document.createElement("span");
-      chip.className = "theme-swatch-color";
-      chip.style.backgroundColor = color;
-      const hex = document.createElement("span");
-      hex.className = "theme-swatch-hex";
-      hex.textContent = color;
-      swatch.append(chip, hex);
-      colors.append(swatch);
-    }
-
-    const apply = document.createElement("button");
-    apply.type = "button";
-    apply.className = "theme-action theme-preset-apply";
-    apply.textContent = "Apply";
-    apply.disabled = !settingsReady;
-    apply.addEventListener("click", () => {
-      applyTheme(buildPresetTheme(preset));
-      themeStatus.textContent = "Applied";
-    });
-
-    row.append(colors, apply);
-    card.append(name, row);
-    themePresetsContainer.append(card);
-  }
-}
-
-function applyTheme(theme) {
-  for (const scope of colorScopes) {
-    const source = theme[scope.prefix];
-    if (!source) continue;
-    const state = { enabled: Boolean(source.enabled) };
-    for (const field of scope.fields) {
-      const color = normalizeHexColor(source[field.key]) || field.fallback;
-      state[field.key] = color;
-      setColorInputs(field.hex, field.picker, color, field.fallback);
-    }
-    colorState[scope.prefix] = state;
-    scope.checkbox.checked = state.enabled;
-    scope.checkbox.disabled = false;
-  }
-  saveSync({ homeColors: { ...colorState.home }, playerColors: { ...colorState.player } });
-}
-
-function currentTheme() {
-  const theme = {};
-  for (const scope of colorScopes) {
-    const state = colorState[scope.prefix] || {};
-    const copy = { enabled: Boolean(state.enabled) };
-    for (const field of scope.fields) copy[field.key] = normalizeHexColor(state[field.key]) || field.fallback;
-    theme[scope.prefix] = copy;
-  }
-  return theme;
-}
-
-function normalizeSavedTheme(value) {
-  if (!value || typeof value !== "object") return null;
-  const theme = {};
-  for (const scope of colorScopes) {
-    const source = value[scope.prefix];
-    if (!source || typeof source !== "object") return null;
-    const state = { enabled: Boolean(source.enabled) };
-    for (const field of scope.fields) state[field.key] = normalizeHexColor(source[field.key]) || field.fallback;
-    theme[scope.prefix] = state;
-  }
-  return theme;
-}
-
-function updateThemeButtons() {
-  themeSaveButton.disabled = !settingsReady;
-  themeLoadButton.disabled = !settingsReady || !savedTheme;
-  for (const button of themePresetsContainer.querySelectorAll(".theme-preset-apply")) {
-    button.disabled = !settingsReady;
-  }
-}
-
-function bindScopeColor(scope, field) {
-  const save = (color) => {
-    colorState[scope.prefix][field.key] = color;
-    saveSync({ [`${scope.prefix}Colors`]: { ...colorState[scope.prefix] } });
-  };
-
-  field.picker.addEventListener("input", () => {
-    const color = normalizeHexColor(field.picker.value);
-    if (!color) return;
-    field.hex.value = color;
-    save(color);
-  });
-
-  field.hex.addEventListener("input", () => {
-    const color = normalizeHexColor(field.hex.value);
-    if (!color) return;
-    field.picker.value = color;
-    save(color);
-  });
-
-  field.hex.addEventListener("change", () => {
-    const color = normalizeHexColor(field.hex.value) || normalizeHexColor(field.picker.value) || field.fallback;
-    field.hex.value = color;
-    field.picker.value = color;
-    save(color);
-  });
-}
 
 let lastYouTubePing = 0;
 let lastYouTubeReload = 0;
@@ -345,54 +57,6 @@ function ensureYouTubeTab() {
       });
     });
   });
-}
-
-function requestBaseColors(done) {
-  const tabs = globalThis.chrome?.tabs;
-  if (!tabs?.query || !tabs?.sendMessage) {
-    done(null);
-    return;
-  }
-
-  let settled = false;
-  let timer = null;
-  const finish = (colors) => {
-    if (settled) return;
-    settled = true;
-    clearTimeout(timer);
-    done(colors);
-  };
-  timer = setTimeout(() => finish(null), 500);
-
-  tabs.query({ url: "*://*.youtube.com/*" }, (result) => {
-    const tab = result && (result.find((candidate) => candidate.active) || result[0]);
-    if (!tab || typeof tab.id !== "number" || typeof tab.url !== "string" || !/^https?:\/\/(?:[^/]+\.)?youtube\.com\//i.test(tab.url)) {
-      finish(null);
-      return;
-    }
-    try {
-      tabs.sendMessage(tab.id, { type: "ytc-base-colors" }, (response) => {
-        void globalThis.chrome?.runtime?.lastError;
-        finish(response?.colors || null);
-      });
-    } catch (error) {
-      finish(null);
-    }
-  });
-}
-
-function applyBaseColorFallbacks(colors) {
-  if (!colors) return;
-  for (const scope of colorScopes) {
-    const source = colors[scope.prefix];
-    if (!source) continue;
-    const complete = scope.fields.every((field) => (scope.prefix === "player" && field.key === "description") || normalizeHexColor(source[field.key]));
-    if (!complete) continue;
-    for (const field of scope.fields) {
-      if (scope.prefix === "player" && field.key === "description") continue;
-      field.fallback = normalizeHexColor(source[field.key]);
-    }
-  }
 }
 
 function saveSync(values) {
@@ -521,27 +185,6 @@ function renderSidebarTree() {
   for (const item of sidebarItems) addRow(item, 0, false);
 }
 
-function normalizeHexColor(value) {
-  const text = String(value || "").trim().replace(/^#/, "");
-  if (/^[0-9a-f]{3}$/i.test(text)) {
-    return `#${text.split("").map((part) => part + part).join("")}`.toLowerCase();
-  }
-  if (/^[0-9a-f]{6}$/i.test(text)) return `#${text}`.toLowerCase();
-  return "";
-}
-
-function setColorInputs(hexInput, picker, value, fallback) {
-  const color = normalizeHexColor(value) || fallback;
-  hexInput.value = color;
-  picker.value = color;
-}
-
-function updatePageColorVisibility() {
-  for (const scope of colorScopes) {
-    scope.suboptions.hidden = scope.option.hidden || !scope.checkbox.checked;
-  }
-}
-
 function applySettings(settings) {
   const value = clampRowValue(settings.videosPerRow);
   rowNumber.value = String(value);
@@ -554,29 +197,6 @@ function applySettings(settings) {
   addDislikesCheckbox.checked = settings.addDislikes !== false;
   removeHashtagsCheckbox.checked = Boolean(settings.removeHashtags);
   noRecommendedCheckbox.checked = Boolean(settings.removeRecommended);
-  for (const scope of colorScopes) {
-    const stored = settings[`${scope.prefix}Colors`] || {};
-    const legacy = scope.fields.every((field) => {
-      const value = normalizeHexColor(stored[field.key]);
-      if (!value || value === legacyColorFallbacks.get(`${scope.prefix}:${field.key}`)) return true;
-      return scope.prefix === "player" && field.key === "description" && (value === "#ffffff" || value === "#0f0f0f");
-    });
-    const state = { enabled: Boolean(stored.enabled) };
-    for (const field of scope.fields) {
-      const storedColor = normalizeHexColor(stored[field.key]);
-      const migrate = scope.prefix === "player" && field.key === "description" && (storedColor === "#ffffff" || storedColor === "#0f0f0f");
-      const color = (legacy || migrate) ? field.fallback : (storedColor || field.fallback);
-      state[field.key] = color;
-      setColorInputs(field.hex, field.picker, color, field.fallback);
-    }
-    colorState[scope.prefix] = state;
-    scope.checkbox.checked = state.enabled;
-    scope.checkbox.disabled = false;
-  }
-  savedTheme = normalizeSavedTheme(settings.savedTheme);
-  settingsReady = true;
-  updateThemeButtons();
-  updatePageColorVisibility();
   fontSelect.value = settings.fontFamily || "";
   if (fontSelect.selectedIndex === -1) fontSelect.value = "";
 }
@@ -589,51 +209,10 @@ const settingsDefaults = {
   addDislikes: true,
   removeHashtags: false,
   removeRecommended: false,
-  homeColors: { enabled: false },
-  playerColors: { enabled: false },
-  savedTheme: null,
   fontFamily: ""
 };
 
 renderSidebarTree();
-buildColorControls();
-renderThemePresets();
-for (const scope of colorScopes) {
-  colorState[scope.prefix] = colorScopeDefaults(scope);
-  scope.checkbox.disabled = true;
-  scope.checkbox.addEventListener("change", () => {
-    const state = colorState[scope.prefix];
-    state.enabled = scope.checkbox.checked;
-    for (const field of scope.fields) {
-      const color = normalizeHexColor(state[field.key]) || normalizeHexColor(field.hex.value) || field.fallback;
-      state[field.key] = color;
-      setColorInputs(field.hex, field.picker, color, field.fallback);
-    }
-    saveSync({ [`${scope.prefix}Colors`]: { ...state } });
-    updatePageColorVisibility();
-  });
-  for (const field of scope.fields) bindScopeColor(scope, field);
-}
-
-themeSaveButton.addEventListener("click", () => {
-  if (!settingsReady || !syncStorage?.set) return;
-  const theme = currentTheme();
-  syncStorage.set({ savedTheme: theme }, () => {
-    if (globalThis.chrome?.runtime?.lastError) {
-      themeStatus.textContent = "Save failed";
-      return;
-    }
-    savedTheme = theme;
-    updateThemeButtons();
-    themeStatus.textContent = "Saved";
-  });
-});
-
-themeLoadButton.addEventListener("click", () => {
-  if (!settingsReady || !savedTheme) return;
-  applyTheme(savedTheme);
-  themeStatus.textContent = "Loaded";
-});
 
 if (localStore?.get) {
   localStore.get({ customFonts: [], sidebarTree: [], sidebarHidden: [] }, (local) => {
@@ -644,11 +223,7 @@ if (localStore?.get) {
   });
 }
 
-requestBaseColors((colors) => {
-  applyBaseColorFallbacks(colors);
-  renderThemePresets();
-  syncStorage?.get(settingsDefaults, applySettings);
-});
+syncStorage?.get(settingsDefaults, applySettings);
 
 globalThis.chrome?.storage?.onChanged?.addListener((changes, area) => {
   if (area !== "local") return;
@@ -808,10 +383,6 @@ function selectSubtab(tab) {
   const hasMainOptions = onHome && tab.dataset.label === "Main";
   const hasSidebarOptions = onHome && tab.dataset.label === "Sidebar";
   const hasPlayerMainOptions = onPlayer && tab.dataset.label === "Main";
-  const colorsVisible = {
-    home: onHome && tab.dataset.label === "Colors",
-    player: onPlayer && tab.dataset.label === "Colors"
-  };
   videosPerRow.hidden = !hasMainOptions;
   cornerOption.hidden = !hasMainOptions;
   noAIOption.hidden = !hasMainOptions;
@@ -821,10 +392,7 @@ function selectSubtab(tab) {
   addDislikesOption.hidden = !hasPlayerMainOptions;
   removeHashtagsOption.hidden = !hasPlayerMainOptions;
   noRecommendedOption.hidden = !hasPlayerMainOptions;
-  for (const scope of colorScopes) scope.option.hidden = !colorsVisible[scope.prefix];
-  updatePageColorVisibility();
-  panelEmpty.hidden = hasMainOptions || hasSidebarOptions || hasPlayerMainOptions ||
-    colorsVisible.home || colorsVisible.player;
+  panelEmpty.hidden = hasMainOptions || hasSidebarOptions || hasPlayerMainOptions;
 }
 
 function renderSubtabs(category) {
@@ -833,22 +401,15 @@ function renderSubtabs(category) {
 
   if (!labels.length) {
     subtabList.hidden = true;
-    for (const option of panel.querySelectorAll(":scope > .option, :scope > .color-suboptions, :scope > #sidebar-options")) {
+    for (const option of panel.querySelectorAll(":scope > .option, :scope > #sidebar-options")) {
       option.hidden = true;
     }
     panel.setAttribute("aria-labelledby", category.id);
-    if (category.id === "tab-themes") {
-      themeView.hidden = false;
-      panelEmpty.hidden = true;
-      return;
-    }
-    themeView.hidden = true;
     panelEmpty.textContent = `No ${category.textContent} settings yet.`;
     panelEmpty.hidden = false;
     return;
   }
 
-  themeView.hidden = true;
   subtabList.hidden = false;
   subtabList.setAttribute("aria-label", `${category.textContent} options`);
 
