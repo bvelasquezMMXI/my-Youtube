@@ -34,6 +34,7 @@ const colorScopes = [
     suboptions: document.getElementById("home-color-options"),
     fields: [
       { key: "text", label: "Text", fallback: "#0f0f0f" },
+      { key: "buttonText", label: "Button text", fallback: "#0f0f0f" },
       { key: "background", label: "Background", fallback: "#ffffff" },
       { key: "header", label: "Header", fallback: "#ffffff" },
       { key: "guide", label: "Guide", fallback: "#ffffff" },
@@ -42,6 +43,7 @@ const colorScopes = [
       { key: "searchText", label: "Search bar text", fallback: "#0f0f0f" },
       { key: "categories", label: "Categories", fallback: "#ffffff" },
       { key: "categoryOptions", label: "Category options", fallback: "#f2f2f2" },
+      { key: "selectedCategory", label: "Selected category", fallback: "#0f0f0f" },
       { key: "categoryArrows", label: "Next/back buttons", fallback: "#ffffff" },
       { key: "createButton", label: "Create button", fallback: "#ffffff" },
       { key: "createButtonText", label: "Create button text", fallback: "#0f0f0f" }
@@ -55,6 +57,7 @@ const colorScopes = [
     suboptions: document.getElementById("player-color-options"),
     fields: [
       { key: "text", label: "Text", fallback: "#0f0f0f" },
+      { key: "buttonText", label: "Button text", fallback: "#0f0f0f" },
       { key: "background", label: "Background", fallback: "#ffffff" },
       { key: "header", label: "Header", fallback: "#ffffff" },
       { key: "guide", label: "Guide", fallback: "#ffffff" },
@@ -77,32 +80,35 @@ const themePresets = [
   {
     name: "Midnight Black",
     home: {
-      text: "#f1f1f1",
-      background: "#000000",
-      header: "#000000",
-      guide: "#000000",
-      cards: "#0f0f0f",
-      search: "#0f0f0f",
-      searchText: "#f1f1f1",
-      categories: "#0f0f0f",
-      categoryOptions: "#272727",
-      categoryArrows: "#0f0f0f",
-      createButton: "#0f0f0f",
-      createButtonText: "#f1f1f1"
+      text: "#e6dff2",
+      buttonText: "#e6dff2",
+      background: "#151020",
+      header: "#1b1429",
+      guide: "#1b1429",
+      cards: "#211a33",
+      search: "#2a2140",
+      searchText: "#e6dff2",
+      categories: "#1b1429",
+      categoryOptions: "#2a2140",
+      selectedCategory: "#7c5cbf",
+      categoryArrows: "#1b1429",
+      createButton: "#2a2140",
+      createButtonText: "#e6dff2"
     },
     player: {
-      text: "#f1f1f1",
-      background: "#000000",
-      header: "#000000",
-      guide: "#000000",
-      recommended: "#0f0f0f",
-      details: "#0f0f0f",
-      description: "#0f0f0f",
-      comments: "#0f0f0f",
-      subscribe: "#f1f1f1",
-      subscribeText: "#0f0f0f",
-      subscribed: "#272727",
-      subscribedText: "#f1f1f1"
+      text: "#e6dff2",
+      buttonText: "#e6dff2",
+      background: "#151020",
+      header: "#1b1429",
+      guide: "#1b1429",
+      recommended: "#1b1429",
+      details: "#1b1429",
+      description: "#2a2140",
+      comments: "#1b1429",
+      subscribe: "#7c5cbf",
+      subscribeText: "#f7f2ff",
+      subscribed: "#2a2140",
+      subscribedText: "#e6dff2"
     }
   }
 ];

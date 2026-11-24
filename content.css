@@ -157,6 +157,16 @@ html[data-ytc-page="home"][data-ytc-home-colors] :where(
   color: var(--ytc-home-text) !important;
 }
 
+html[data-ytc-page="home"][data-ytc-home-colors] :where(
+  button, ytd-button-renderer, yt-button-shape, tp-yt-paper-button,
+  [role="button"], a.ytSpecButtonShapeNextHost
+):not(:where(.html5-video-player *)) :where(
+  span, div, yt-formatted-string, yt-attributed-string,
+  .ytAttributedStringHost, .yt-core-attributed-string
+):not(:where(yt-icon *)):not(:where(:has(svg))) {
+  color: var(--ytc-home-button-text) !important;
+}
+
 html[data-ytc-page="home"][data-ytc-home-colors] ytd-app {
   background-color: var(--ytc-home-background) !important;
 }
@@ -186,6 +196,8 @@ html[data-ytc-page="home"][data-ytc-home-colors] :is(
   #search-form
 ) {
   background-color: var(--ytc-home-search) !important;
+  border-color: var(--ytc-home-search) !important;
+  box-shadow: none !important;
 }
 
 html[data-ytc-page="home"][data-ytc-home-colors] :is(
@@ -227,7 +239,19 @@ html[data-ytc-page="home"][data-ytc-home-colors] yt-chip-cloud-chip-renderer:not
   color: var(--ytc-home-category-options-text) !important;
 }
 
+html[data-ytc-page="home"][data-ytc-home-colors] yt-chip-cloud-chip-renderer:is([selected], .iron-selected) .ytChipShapeChip {
+  background-color: var(--ytc-home-selected-category) !important;
+}
+
+html[data-ytc-page="home"][data-ytc-home-colors] yt-chip-cloud-chip-renderer:is([selected], .iron-selected) :is(.ytChipShapeChip, .ytChipShapeText) {
+  color: var(--ytc-home-selected-category-text) !important;
+}
+
 html[data-ytc-page="home"][data-ytc-home-colors] :is(
+  ytd-masthead ytd-button-renderer.ytd-masthead:has(yt-icon),
+  ytd-masthead ytd-button-renderer.ytd-masthead:has(yt-icon) button,
+  ytd-masthead ytd-button-renderer.ytd-masthead:has(yt-icon) a,
+  ytd-masthead ytd-button-renderer.ytd-masthead:has(yt-icon) yt-icon-button,
   #create-button,
   #create-button button,
   ytd-masthead #buttons button:has(#create),
@@ -240,6 +264,10 @@ html[data-ytc-page="home"][data-ytc-home-colors] :is(
 }
 
 html[data-ytc-page="home"][data-ytc-home-colors] :is(
+  ytd-masthead ytd-button-renderer.ytd-masthead:has(yt-icon),
+  ytd-masthead ytd-button-renderer.ytd-masthead:has(yt-icon) button,
+  ytd-masthead ytd-button-renderer.ytd-masthead:has(yt-icon) a,
+  ytd-masthead ytd-button-renderer.ytd-masthead:has(yt-icon) yt-icon-button,
   #create-button,
   #create-button button,
   ytd-masthead #buttons button:has(#create),
@@ -255,6 +283,22 @@ html[data-ytc-page="home"][data-ytc-home-colors] :is(
   stroke: var(--ytc-home-create-button-text) !important;
 }
 
+html[data-ytc-page="home"][data-ytc-home-colors] :is(
+  ytd-masthead ytd-button-renderer.ytd-masthead:has(yt-icon),
+  ytd-masthead ytd-button-renderer.ytd-masthead:has(yt-icon) button,
+  ytd-masthead ytd-button-renderer.ytd-masthead:has(yt-icon) a,
+  ytd-masthead ytd-button-renderer.ytd-masthead:has(yt-icon) yt-icon-button,
+  #create-button,
+  #create-button button,
+  ytd-masthead #buttons button:has(#create),
+  ytd-masthead #buttons ytd-topbar-menu-button-renderer:has(#create),
+  ytd-masthead #buttons button[aria-label="Create"],
+  ytd-masthead #buttons ytd-topbar-menu-button-renderer:has(button[aria-label="Create"])
+) :is(yt-touch-feedback-shape, .ytSpecTouchFeedbackShapeStroke, .ytSpecTouchFeedbackShapeFill) {
+  background-color: var(--ytc-home-create-button) !important;
+  border-color: var(--ytc-home-create-button-text) !important;
+}
+
 html[data-ytc-page="watch"][data-ytc-player-colors] :where(
   h1, h2, h3, h4, h5, h6, p, span, a,
   yt-formatted-string, yt-attributed-string, yt-core-attributed-string,
@@ -262,6 +306,16 @@ html[data-ytc-page="watch"][data-ytc-player-colors] :where(
   #title, #video-title, #description
 ):not(:where(.html5-video-player *)) {
   color: var(--ytc-player-text) !important;
+}
+
+html[data-ytc-page="watch"][data-ytc-player-colors] :where(
+  button, ytd-button-renderer, yt-button-shape, tp-yt-paper-button,
+  [role="button"], a.ytSpecButtonShapeNextHost
+):not(:where(.html5-video-player *)) :where(
+  span, div, yt-formatted-string, yt-attributed-string,
+  .ytAttributedStringHost, .yt-core-attributed-string
+):not(:where(yt-icon *)):not(:where(:has(svg))) {
+  color: var(--ytc-player-button-text) !important;
 }
 
 html[data-ytc-page="watch"][data-ytc-player-colors] ytd-app {

@@ -58,6 +58,7 @@ const COLOR_SCOPE_PREFIXES = ["home", "player"];
 const COLOR_FIELDS = {
   home: {
     text: "#0f0f0f",
+    buttonText: "#0f0f0f",
     background: "#ffffff",
     header: "#ffffff",
     guide: "#ffffff",
@@ -66,12 +67,14 @@ const COLOR_FIELDS = {
     searchText: "#0f0f0f",
     categories: "#ffffff",
     categoryOptions: "#f2f2f2",
+    selectedCategory: "#0f0f0f",
     categoryArrows: "#ffffff",
     createButton: "#ffffff",
     createButtonText: "#0f0f0f"
   },
   player: {
     text: "#0f0f0f",
+    buttonText: "#0f0f0f",
     background: "#ffffff",
     header: "#ffffff",
     guide: "#ffffff",
@@ -199,9 +202,12 @@ function applyPageColors(prefix) {
   if (prefix === "home") {
     if (state.enabled) {
       const optionsColor = normalizeSubscribeColor(state.categoryOptions, COLOR_FIELDS.home.categoryOptions);
+      const selectedColor = normalizeSubscribeColor(state.selectedCategory, COLOR_FIELDS.home.selectedCategory);
       root.style.setProperty("--ytc-home-category-options-text", readableSubscribeText(optionsColor));
+      root.style.setProperty("--ytc-home-selected-category-text", readableSubscribeText(selectedColor));
     } else {
       root.style.removeProperty("--ytc-home-category-options-text");
+      root.style.removeProperty("--ytc-home-selected-category-text");
     }
   }
 
@@ -270,7 +276,7 @@ function sampleBaseColors() {
 
   const coloredSubscribeSaved = root.dataset.ytcColoredSubscribe;
   if (coloredSubscribeSaved !== undefined) delete root.dataset.ytcColoredSubscribe;
-  for (const property of ["--ytc-home-category-options-text", "--ytc-subscribe-color", "--ytc-subscribe-text", "--ytc-subscribed-color", "--ytc-subscribed-text"]) {
+  for (const property of ["--ytc-home-category-options-text", "--ytc-home-selected-category-text", "--ytc-subscribe-color", "--ytc-subscribe-text", "--ytc-subscribed-color", "--ytc-subscribed-text"]) {
     savedProperties.push([property, root.style.getPropertyValue(property), root.style.getPropertyPriority(property)]);
     root.style.removeProperty(property);
   }
@@ -314,6 +320,10 @@ function sampleBaseColors() {
     "#chip-bar"
   ])) || background;
   const categoryOptions = dark ? "#272727" : "#f2f2f2";
+  const selectedCategory = effectiveBackgroundColor(firstMatchingElement([
+    "yt-chip-cloud-chip-renderer[selected] .ytChipShapeChip",
+    "yt-chip-cloud-chip-renderer.iron-selected .ytChipShapeChip"
+  ])) || (dark ? "#f1f1f1" : "#0f0f0f");
   const categoryArrows = effectiveBackgroundColor(firstMatchingElement([
     "#right-arrow-button button",
     "#left-arrow-button button",
@@ -321,6 +331,10 @@ function sampleBaseColors() {
     "#left-arrow-button"
   ])) || background;
   const createButtonElement = firstMatchingElement([
+    "ytd-masthead ytd-button-renderer.ytd-masthead:has(yt-icon)",
+    "ytd-masthead ytd-button-renderer.ytd-masthead:has(yt-icon) button",
+    "ytd-masthead ytd-button-renderer.ytd-masthead:has(yt-icon) a",
+    "ytd-masthead ytd-button-renderer.ytd-masthead:has(yt-icon) yt-icon-button",
     "ytd-masthead #buttons button:has(#create)",
     "ytd-masthead #buttons ytd-topbar-menu-button-renderer:has(#create)",
     "ytd-masthead #buttons button[aria-label='Create']",
@@ -351,8 +365,8 @@ function sampleBaseColors() {
   if (coloredSubscribeSaved !== undefined) root.dataset.ytcColoredSubscribe = coloredSubscribeSaved;
 
   return {
-    home: { text, background, header, guide, cards, search, searchText, categories, categoryOptions, categoryArrows, createButton, createButtonText },
-    player: { text, background, header, guide, recommended, details, description, comments, subscribe, subscribeText, subscribed, subscribedText }
+    home: { text, buttonText: text, background, header, guide, cards, search, searchText, categories, categoryOptions, selectedCategory, categoryArrows, createButton, createButtonText },
+    player: { text, buttonText: text, background, header, guide, recommended, details, description, comments, subscribe, subscribeText, subscribed, subscribedText }
   };
 }
 
@@ -743,7 +757,7 @@ function readableSubscribeText(color) {
   const green = parseInt(color.slice(3, 5), 16);
   const blue = parseInt(color.slice(5, 7), 16);
   const luminance = 0.2126 * red + 0.7152 * green + 0.0722 * blue;
-  return luminance > 140 ? "#0f0f0f" : "#ffffff";
+  return luminance > 140 ? "#0f0f0f" : "#f1f1f1";
 }
 
 function isSubscribeButtonSubscribed(renderer) {
