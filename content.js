@@ -47,6 +47,7 @@ const SIDEBAR_HIDDEN_CLASS = "ytc-sidebar-hidden";
 const SIDEBAR_TREE_STORAGE_KEY = "sidebarTree";
 const SIDEBAR_STATE_VERSION = 2;
 const SUBSCRIPTIONS_SECTION_ATTR = "data-ytc-subscriptions-section";
+const YOU_SECTION_ATTR = "data-ytc-you-section";
 const SUBSCRIPTION_NAME_ATTR = "data-ytc-subscription-name";
 const SUBSCRIPTIONS_REDACTED_CLASS = "ytc-subscriptions-redacted";
 const SUBSCRIPTION_HIDE_KEY = "subscriptions:hide-names";
@@ -677,6 +678,8 @@ function buildSidebarTree() {
       if (title) {
         const key = uniqueSidebarKey(usedKeys, `section:${sidebarKeyText(title)}`);
         markSidebarElement(section, key);
+        if (/^you$/i.test(title)) section.setAttribute(YOU_SECTION_ATTR, "");
+        else section.removeAttribute(YOU_SECTION_ATTR);
 
         if (/^subscriptions$/i.test(title)) {
           markSubscriptionNames(section);
@@ -709,6 +712,8 @@ function buildSidebarTree() {
             if (!title) continue;
             const key = uniqueSidebarKey(usedKeys, `section:${sidebarKeyText(title)}`);
             markSidebarElement(node, key);
+            if (/^you$/i.test(title)) node.setAttribute(YOU_SECTION_ATTR, "");
+            else node.removeAttribute(YOU_SECTION_ATTR);
             if (/^subscriptions$/i.test(title)) {
               markCollapsibleSubscriptionNames(node);
               addSidebarItem(tree, {
@@ -924,9 +929,15 @@ function applySidebarHidden() {
   }
 
   const hideSubscriptions = sidebarHiddenKeys.has(SUBSCRIPTION_HIDE_KEY);
-  for (const section of document.querySelectorAll(`[${SUBSCRIPTIONS_SECTION_ATTR}]`)) {
-    section.classList.toggle(SUBSCRIPTIONS_REDACTED_CLASS, hideSubscriptions);
+  if (hideSubscriptions) {
+    const guide = document.querySelector("ytd-guide-renderer");
+    for (const entry of guide?.querySelectorAll("ytd-guide-entry-renderer") || []) {
+      if (entry.closest(`[${YOU_SECTION_ATTR}]`)) continue;
+      if (!entry.querySelector('a[href^="/@"], a[href^="/channel/"]')) continue;
+      entry.setAttribute(SUBSCRIPTION_NAME_ATTR, "");
+    }
   }
+  document.documentElement.classList.toggle(SUBSCRIPTIONS_REDACTED_CLASS, hideSubscriptions);
 }
 
 function syncSidebar() {
