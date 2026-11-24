@@ -61,7 +61,11 @@ const COLOR_FIELDS = {
     background: "#ffffff",
     header: "#ffffff",
     guide: "#ffffff",
-    cards: "#ffffff"
+    cards: "#ffffff",
+    search: "#ffffff",
+    searchText: "#0f0f0f",
+    categories: "#ffffff",
+    categoryArrows: "#ffffff"
   },
   player: {
     text: "#0f0f0f",
@@ -70,6 +74,7 @@ const COLOR_FIELDS = {
     guide: "#ffffff",
     recommended: "#ffffff",
     details: "#ffffff",
+    description: "#f2f2f2",
     comments: "#ffffff",
     subscribe: "#cc0000",
     subscribeText: "#ffffff",
@@ -167,6 +172,10 @@ function applyRemoveRecommended(value) {
   if (changed) window.dispatchEvent(new Event("resize"));
 }
 
+function colorVariable(prefix, key) {
+  return `--ytc-${prefix}-${key.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}`;
+}
+
 function applyPageColors(prefix) {
   const root = document.documentElement;
   const state = colorStates[prefix];
@@ -175,12 +184,12 @@ function applyPageColors(prefix) {
   if (state.enabled) {
     root.dataset[attr] = "1";
     for (const [key, fallback] of Object.entries(COLOR_FIELDS[prefix])) {
-      root.style.setProperty(`--ytc-${prefix}-${key}`, state[key] || fallback);
+      root.style.setProperty(colorVariable(prefix, key), state[key] || fallback);
     }
   } else {
     delete root.dataset[attr];
     for (const key of Object.keys(COLOR_FIELDS[prefix])) {
-      root.style.removeProperty(`--ytc-${prefix}-${key}`);
+      root.style.removeProperty(colorVariable(prefix, key));
     }
   }
 
@@ -241,7 +250,7 @@ function sampleBaseColors() {
     savedAttributes[attribute] = root.dataset[attribute];
     if (savedAttributes[attribute] !== undefined) delete root.dataset[attribute];
     for (const key of Object.keys(COLOR_FIELDS[prefix])) {
-      const property = `--ytc-${prefix}-${key}`;
+      const property = colorVariable(prefix, key);
       savedProperties.push([property, root.style.getPropertyValue(property), root.style.getPropertyPriority(property)]);
       root.style.removeProperty(property);
     }
@@ -273,8 +282,34 @@ function sampleBaseColors() {
   const header = effectiveBackgroundColor(document.querySelector("ytd-masthead")) || background;
   const guide = effectiveBackgroundColor(firstMatchingElement(["ytd-guide-renderer", "ytd-mini-guide-renderer", "#guide-content"])) || background;
   const cards = effectiveBackgroundColor(firstMatchingElement(["ytd-rich-item-renderer", "ytd-rich-grid-renderer", "ytd-rich-shelf-renderer"])) || background;
+  const search = effectiveBackgroundColor(firstMatchingElement([
+    "yt-searchbox .ytSearchboxComponentInputBox",
+    "ytd-searchbox",
+    "ytd-masthead #search-form",
+    "#search-form"
+  ])) || background;
+  const searchTextElement = firstMatchingElement([
+    "yt-searchbox input.ytSearchboxComponentInput",
+    "ytd-searchbox input#search",
+    "ytd-masthead #search input",
+    "ytd-masthead input#search"
+  ]);
+  const searchText = computedColorToHex(searchTextElement ? getComputedStyle(searchTextElement).color : "") || text;
+  const categories = effectiveBackgroundColor(firstMatchingElement([
+    "ytd-feed-filter-chip-bar-renderer",
+    "yt-chip-cloud-renderer",
+    "#chips-wrapper",
+    "#chip-bar"
+  ])) || background;
+  const categoryArrows = effectiveBackgroundColor(firstMatchingElement([
+    "#right-arrow-button button",
+    "#left-arrow-button button",
+    "#right-arrow-button",
+    "#left-arrow-button"
+  ])) || background;
   const recommended = effectiveBackgroundColor(firstMatchingElement(["#secondary", "ytd-watch-next-secondary-results-renderer"])) || background;
   const details = effectiveBackgroundColor(firstMatchingElement(["ytd-watch-metadata", "#below"])) || background;
+  const description = "#f2f2f2";
   const comments = effectiveBackgroundColor(firstMatchingElement(["#comments", "ytd-comments"])) || background;
 
   // YouTube's own subscribe button is white on dark and black on light; the
@@ -293,15 +328,20 @@ function sampleBaseColors() {
   if (coloredSubscribeSaved !== undefined) root.dataset.ytcColoredSubscribe = coloredSubscribeSaved;
 
   return {
-    home: { text, background, header, guide, cards },
-    player: { text, background, header, guide, recommended, details, comments, subscribe, subscribeText, subscribed, subscribedText }
+    home: { text, background, header, guide, cards, search, searchText, categories, categoryArrows },
+    player: { text, background, header, guide, recommended, details, description, comments, subscribe, subscribeText, subscribed, subscribedText }
   };
+}
+
+function isLegacyDescriptionColor(value) {
+  return value === "#ffffff" || value === "#0f0f0f";
 }
 
 function isLegacyColorState(prefix, stored) {
   return Object.keys(COLOR_FIELDS[prefix]).every((key) => {
     const value = normalizeSubscribeColor(stored[key], "");
-    return !value || value === COLOR_FIELDS[prefix][key];
+    if (!value || value === COLOR_FIELDS[prefix][key]) return true;
+    return prefix === "player" && key === "description" && isLegacyDescriptionColor(value);
   });
 }
 
@@ -314,7 +354,8 @@ function buildColorState(prefix, stored, base) {
   const state = { enabled: Boolean(stored.enabled) };
   for (const [key, fallback] of Object.entries(COLOR_FIELDS[prefix])) {
     const value = normalizeSubscribeColor(stored[key], "");
-    state[key] = !legacy && value ? value : (base?.[key] || value || fallback);
+    const migrate = prefix === "player" && key === "description" && isLegacyDescriptionColor(value);
+    state[key] = !legacy && value && !migrate ? value : (base?.[key] || fallback);
   }
   return state;
 }

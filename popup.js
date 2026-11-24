@@ -37,7 +37,11 @@ const colorScopes = [
       { key: "background", label: "Background", fallback: "#ffffff" },
       { key: "header", label: "Header", fallback: "#ffffff" },
       { key: "guide", label: "Guide", fallback: "#ffffff" },
-      { key: "cards", label: "Cards", fallback: "#ffffff" }
+      { key: "cards", label: "Cards", fallback: "#ffffff" },
+      { key: "search", label: "Search bar", fallback: "#ffffff" },
+      { key: "searchText", label: "Search bar text", fallback: "#0f0f0f" },
+      { key: "categories", label: "Categories", fallback: "#ffffff" },
+      { key: "categoryArrows", label: "Next/back buttons", fallback: "#ffffff" }
     ]
   },
   {
@@ -53,6 +57,7 @@ const colorScopes = [
       { key: "guide", label: "Guide", fallback: "#ffffff" },
       { key: "recommended", label: "Recommended", fallback: "#ffffff" },
       { key: "details", label: "Video details", fallback: "#ffffff" },
+      { key: "description", label: "Description", fallback: "#f2f2f2" },
       { key: "comments", label: "Comments", fallback: "#ffffff" },
       { key: "subscribe", label: "Subscribe (not subscribed)", fallback: "#cc0000" },
       { key: "subscribeText", label: "Subscribe text (not subscribed)", fallback: "#ffffff" },
@@ -61,6 +66,43 @@ const colorScopes = [
     ]
   }
 ];
+const themePresets = [
+  {
+    name: "Midnight Black",
+    home: {
+      text: "#f1f1f1",
+      background: "#000000",
+      header: "#000000",
+      guide: "#000000",
+      cards: "#0f0f0f",
+      search: "#0f0f0f",
+      searchText: "#f1f1f1",
+      categories: "#0f0f0f",
+      categoryArrows: "#0f0f0f"
+    },
+    player: {
+      text: "#f1f1f1",
+      background: "#000000",
+      header: "#000000",
+      guide: "#000000",
+      recommended: "#0f0f0f",
+      details: "#0f0f0f",
+      description: "#0f0f0f",
+      comments: "#0f0f0f",
+      subscribe: "#f1f1f1",
+      subscribeText: "#0f0f0f",
+      subscribed: "#272727",
+      subscribedText: "#f1f1f1"
+    }
+  }
+];
+const themeView = document.getElementById("theme-view");
+const themePresetsContainer = document.getElementById("theme-presets");
+const themeSaveButton = document.getElementById("theme-save");
+const themeLoadButton = document.getElementById("theme-load");
+const themeStatus = document.getElementById("theme-status");
+let savedTheme = null;
+let settingsReady = false;
 const syncStorage = globalThis.chrome?.storage?.sync;
 const localStore = globalThis.chrome?.storage?.local;
 const legacyColorFallbacks = new Map();
@@ -110,6 +152,119 @@ function buildColorControls() {
       field.hex = hex;
       field.picker = picker;
     }
+  }
+}
+
+function renderThemePresets() {
+  themePresetsContainer.replaceChildren();
+  for (const preset of themePresets) {
+    const card = document.createElement("div");
+    card.className = "theme-preset";
+
+    const name = document.createElement("div");
+    name.className = "theme-preset-name";
+    name.textContent = preset.name;
+
+    const row = document.createElement("div");
+    row.className = "theme-preset-row";
+
+    const colors = document.createElement("div");
+    colors.className = "theme-preset-colors";
+    const entries = new Map();
+    for (const scope of colorScopes) {
+      const source = preset[scope.prefix];
+      for (const field of scope.fields) {
+        const color = normalizeHexColor(source[field.key]);
+        if (!color) continue;
+        if (!entries.has(color)) entries.set(color, []);
+        const labels = entries.get(color);
+        if (!labels.includes(field.label)) labels.push(field.label);
+      }
+    }
+    for (const [color, labels] of entries) {
+      const swatch = document.createElement("span");
+      swatch.className = "theme-swatch";
+      swatch.title = `${color} — ${labels.join(", ")}`;
+      swatch.setAttribute("aria-label", swatch.title);
+      const chip = document.createElement("span");
+      chip.className = "theme-swatch-color";
+      chip.style.backgroundColor = color;
+      const hex = document.createElement("span");
+      hex.className = "theme-swatch-hex";
+      hex.textContent = color;
+      swatch.append(chip, hex);
+      colors.append(swatch);
+    }
+
+    const apply = document.createElement("button");
+    apply.type = "button";
+    apply.className = "theme-action theme-preset-apply";
+    apply.textContent = "Apply";
+    apply.disabled = !settingsReady;
+    apply.addEventListener("click", () => {
+      const theme = {};
+      for (const scope of colorScopes) {
+        theme[scope.prefix] = { enabled: true };
+        for (const field of scope.fields) {
+          theme[scope.prefix][field.key] = normalizeHexColor(preset[scope.prefix][field.key]) || field.fallback;
+        }
+      }
+      applyTheme(theme);
+      themeStatus.textContent = "Applied";
+    });
+
+    row.append(colors, apply);
+    card.append(name, row);
+    themePresetsContainer.append(card);
+  }
+}
+
+function applyTheme(theme) {
+  for (const scope of colorScopes) {
+    const source = theme[scope.prefix];
+    if (!source) continue;
+    const state = { enabled: Boolean(source.enabled) };
+    for (const field of scope.fields) {
+      const color = normalizeHexColor(source[field.key]) || field.fallback;
+      state[field.key] = color;
+      setColorInputs(field.hex, field.picker, color, field.fallback);
+    }
+    colorState[scope.prefix] = state;
+    scope.checkbox.checked = state.enabled;
+    scope.checkbox.disabled = false;
+  }
+  saveSync({ homeColors: { ...colorState.home }, playerColors: { ...colorState.player } });
+}
+
+function currentTheme() {
+  const theme = {};
+  for (const scope of colorScopes) {
+    const state = colorState[scope.prefix] || {};
+    const copy = { enabled: Boolean(state.enabled) };
+    for (const field of scope.fields) copy[field.key] = normalizeHexColor(state[field.key]) || field.fallback;
+    theme[scope.prefix] = copy;
+  }
+  return theme;
+}
+
+function normalizeSavedTheme(value) {
+  if (!value || typeof value !== "object") return null;
+  const theme = {};
+  for (const scope of colorScopes) {
+    const source = value[scope.prefix];
+    if (!source || typeof source !== "object") return null;
+    const state = { enabled: Boolean(source.enabled) };
+    for (const field of scope.fields) state[field.key] = normalizeHexColor(source[field.key]) || field.fallback;
+    theme[scope.prefix] = state;
+  }
+  return theme;
+}
+
+function updateThemeButtons() {
+  themeSaveButton.disabled = !settingsReady;
+  themeLoadButton.disabled = !settingsReady || !savedTheme;
+  for (const button of themePresetsContainer.querySelectorAll(".theme-preset-apply")) {
+    button.disabled = !settingsReady;
   }
 }
 
@@ -208,9 +363,12 @@ function applyBaseColorFallbacks(colors) {
   for (const scope of colorScopes) {
     const source = colors[scope.prefix];
     if (!source) continue;
-    const complete = scope.fields.every((field) => normalizeHexColor(source[field.key]));
+    const complete = scope.fields.every((field) => (scope.prefix === "player" && field.key === "description") || normalizeHexColor(source[field.key]));
     if (!complete) continue;
-    for (const field of scope.fields) field.fallback = normalizeHexColor(source[field.key]);
+    for (const field of scope.fields) {
+      if (scope.prefix === "player" && field.key === "description") continue;
+      field.fallback = normalizeHexColor(source[field.key]);
+    }
   }
 }
 
@@ -377,12 +535,14 @@ function applySettings(settings) {
     const stored = settings[`${scope.prefix}Colors`] || {};
     const legacy = scope.fields.every((field) => {
       const value = normalizeHexColor(stored[field.key]);
-      return !value || value === legacyColorFallbacks.get(`${scope.prefix}:${field.key}`);
+      if (!value || value === legacyColorFallbacks.get(`${scope.prefix}:${field.key}`)) return true;
+      return scope.prefix === "player" && field.key === "description" && (value === "#ffffff" || value === "#0f0f0f");
     });
     const state = { enabled: Boolean(stored.enabled) };
     for (const field of scope.fields) {
       const storedColor = normalizeHexColor(stored[field.key]);
-      const color = legacy ? field.fallback : (storedColor || field.fallback);
+      const migrate = scope.prefix === "player" && field.key === "description" && (storedColor === "#ffffff" || storedColor === "#0f0f0f");
+      const color = (legacy || migrate) ? field.fallback : (storedColor || field.fallback);
       state[field.key] = color;
       setColorInputs(field.hex, field.picker, color, field.fallback);
     }
@@ -390,6 +550,9 @@ function applySettings(settings) {
     scope.checkbox.checked = state.enabled;
     scope.checkbox.disabled = false;
   }
+  savedTheme = normalizeSavedTheme(settings.savedTheme);
+  settingsReady = true;
+  updateThemeButtons();
   updatePageColorVisibility();
   fontSelect.value = settings.fontFamily || "";
   if (fontSelect.selectedIndex === -1) fontSelect.value = "";
@@ -405,11 +568,13 @@ const settingsDefaults = {
   removeRecommended: false,
   homeColors: { enabled: false },
   playerColors: { enabled: false },
+  savedTheme: null,
   fontFamily: ""
 };
 
 renderSidebarTree();
 buildColorControls();
+renderThemePresets();
 for (const scope of colorScopes) {
   colorState[scope.prefix] = colorScopeDefaults(scope);
   scope.checkbox.disabled = true;
@@ -426,6 +591,26 @@ for (const scope of colorScopes) {
   });
   for (const field of scope.fields) bindScopeColor(scope, field);
 }
+
+themeSaveButton.addEventListener("click", () => {
+  if (!settingsReady || !syncStorage?.set) return;
+  const theme = currentTheme();
+  syncStorage.set({ savedTheme: theme }, () => {
+    if (globalThis.chrome?.runtime?.lastError) {
+      themeStatus.textContent = "Save failed";
+      return;
+    }
+    savedTheme = theme;
+    updateThemeButtons();
+    themeStatus.textContent = "Saved";
+  });
+});
+
+themeLoadButton.addEventListener("click", () => {
+  if (!settingsReady || !savedTheme) return;
+  applyTheme(savedTheme);
+  themeStatus.textContent = "Loaded";
+});
 
 if (localStore?.get) {
   localStore.get({ customFonts: [], sidebarTree: [], sidebarHidden: [] }, (local) => {
@@ -628,11 +813,18 @@ function renderSubtabs(category) {
       option.hidden = true;
     }
     panel.setAttribute("aria-labelledby", category.id);
+    if (category.id === "tab-themes") {
+      themeView.hidden = false;
+      panelEmpty.hidden = true;
+      return;
+    }
+    themeView.hidden = true;
     panelEmpty.textContent = `No ${category.textContent} settings yet.`;
     panelEmpty.hidden = false;
     return;
   }
 
+  themeView.hidden = true;
   subtabList.hidden = false;
   subtabList.setAttribute("aria-label", `${category.textContent} options`);
 

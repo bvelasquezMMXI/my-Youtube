@@ -16,6 +16,14 @@
 
   <main>
     <section class="panel" id="panel" role="tabpanel">
+      <div class="theme-view" id="theme-view" hidden>
+        <div id="theme-presets"></div>
+        <div class="theme-actions">
+          <button class="theme-action" id="theme-save" type="button" disabled>Save theme</button>
+          <button class="theme-action" id="theme-load" type="button" disabled>Load theme</button>
+          <span class="theme-status" id="theme-status"></span>
+        </div>
+      </div>
       <p class="empty" id="panel-empty"></p>
       <div class="option" id="videos-per-row" hidden>
         <label class="option-label" for="videos-per-row-number">Videos per row</label>

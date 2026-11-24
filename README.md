@@ -36,11 +36,15 @@ original text. **Remove recommended videos** hides the watch page's right
 column and expands the player, description, and comments to the full width.
 **Home** and **Player** each have a **Colors** subtab with one **Custom colors**
 checkbox and individual color rows for Text, Background, Header, Guide, and the
-page's major elements: Cards on Home; Recommended, Video details, Comments, and
-the Subscribe button's background and text for each state on Player. Home colors
-apply only on the Home feed and Player colors only on watch pages. Each row
-starts at the page's current, unmodified color, so enabling the checkbox
-changes nothing until a value is edited.
+page's major elements: Cards, Search bar, Search bar text, Categories, and
+Next/back buttons on Home; Recommended, Video details, Description, Comments,
+and the Subscribe button's background and text for each state on Player. Home
+colors apply only on the Home feed and Player colors only on watch
+pages. Each row starts at the page's current, unmodified color, so enabling the
+checkbox changes nothing until a value is edited. **Themes** has a **Midnight
+Black** preset with its palette shown as swatches and an **Apply** button, plus
+**Save theme** and **Load theme** buttons for storing and restoring the current
+color setup.
 
 ## Load unpacked
 

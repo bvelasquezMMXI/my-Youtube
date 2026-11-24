@@ -174,10 +174,49 @@ html[data-ytc-page="home"][data-ytc-home-colors] :is(
 html[data-ytc-page="home"][data-ytc-home-colors] :is(
   ytd-rich-grid-renderer, ytd-rich-section-renderer, ytd-rich-item-renderer,
   ytd-rich-shelf-renderer, yt-lockup-view-model, yt-lockup-metadata-view-model,
-  ytd-feed-filter-chip-bar-renderer, #chips-wrapper,
   ytd-two-column-browse-results-renderer, ytd-section-list-renderer
 ) {
   background-color: var(--ytc-home-cards) !important;
+}
+
+html[data-ytc-page="home"][data-ytc-home-colors] :is(
+  yt-searchbox .ytSearchboxComponentInputBox,
+  yt-searchbox .ytSearchboxComponentSearchButton,
+  ytd-searchbox,
+  #search-form
+) {
+  background-color: var(--ytc-home-search) !important;
+}
+
+html[data-ytc-page="home"][data-ytc-home-colors] :is(
+  yt-searchbox input,
+  ytd-searchbox input,
+  #masthead input#search
+) {
+  color: var(--ytc-home-search-text) !important;
+}
+
+html[data-ytc-page="home"][data-ytc-home-colors] :is(
+  yt-searchbox input,
+  ytd-searchbox input,
+  #masthead input#search
+)::placeholder {
+  color: var(--ytc-home-search-text) !important;
+  opacity: 1;
+}
+
+html[data-ytc-page="home"][data-ytc-home-colors] :is(
+  ytd-feed-filter-chip-bar-renderer, yt-chip-cloud-renderer,
+  #chips-wrapper, #chip-bar
+) {
+  background-color: var(--ytc-home-categories) !important;
+}
+
+html[data-ytc-page="home"][data-ytc-home-colors] :is(
+  #right-arrow-button button, #left-arrow-button button,
+  #right-arrow-button, #left-arrow-button
+) {
+  background-color: var(--ytc-home-category-arrows) !important;
 }
 
 html[data-ytc-page="watch"][data-ytc-player-colors] :where(
@@ -210,9 +249,15 @@ html[data-ytc-page="watch"][data-ytc-player-colors] :is(
 }
 
 html[data-ytc-page="watch"][data-ytc-player-colors] :is(
-  ytd-watch-metadata, #below, #description, ytd-text-inline-expander
+  ytd-watch-metadata, #below
 ) {
   background-color: var(--ytc-player-details) !important;
+}
+
+html[data-ytc-page="watch"][data-ytc-player-colors] :is(
+  #description, ytd-text-inline-expander
+) {
+  background-color: var(--ytc-player-description) !important;
 }
 
 html[data-ytc-page="watch"][data-ytc-player-colors] :is(
