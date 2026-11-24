@@ -65,7 +65,10 @@ const COLOR_FIELDS = {
     search: "#ffffff",
     searchText: "#0f0f0f",
     categories: "#ffffff",
-    categoryArrows: "#ffffff"
+    categoryOptions: "#f2f2f2",
+    categoryArrows: "#ffffff",
+    createButton: "#ffffff",
+    createButtonText: "#0f0f0f"
   },
   player: {
     text: "#0f0f0f",
@@ -193,6 +196,15 @@ function applyPageColors(prefix) {
     }
   }
 
+  if (prefix === "home") {
+    if (state.enabled) {
+      const optionsColor = normalizeSubscribeColor(state.categoryOptions, COLOR_FIELDS.home.categoryOptions);
+      root.style.setProperty("--ytc-home-category-options-text", readableSubscribeText(optionsColor));
+    } else {
+      root.style.removeProperty("--ytc-home-category-options-text");
+    }
+  }
+
   if (prefix === "player") {
     applyColoredSubscribe(state.enabled, state.subscribe, state.subscribed, state.subscribeText, state.subscribedText);
   }
@@ -258,7 +270,7 @@ function sampleBaseColors() {
 
   const coloredSubscribeSaved = root.dataset.ytcColoredSubscribe;
   if (coloredSubscribeSaved !== undefined) delete root.dataset.ytcColoredSubscribe;
-  for (const property of ["--ytc-subscribe-color", "--ytc-subscribe-text", "--ytc-subscribed-color", "--ytc-subscribed-text"]) {
+  for (const property of ["--ytc-home-category-options-text", "--ytc-subscribe-color", "--ytc-subscribe-text", "--ytc-subscribed-color", "--ytc-subscribed-text"]) {
     savedProperties.push([property, root.style.getPropertyValue(property), root.style.getPropertyPriority(property)]);
     root.style.removeProperty(property);
   }
@@ -301,12 +313,23 @@ function sampleBaseColors() {
     "#chips-wrapper",
     "#chip-bar"
   ])) || background;
+  const categoryOptions = dark ? "#272727" : "#f2f2f2";
   const categoryArrows = effectiveBackgroundColor(firstMatchingElement([
     "#right-arrow-button button",
     "#left-arrow-button button",
     "#right-arrow-button",
     "#left-arrow-button"
   ])) || background;
+  const createButtonElement = firstMatchingElement([
+    "ytd-masthead #buttons button:has(#create)",
+    "ytd-masthead #buttons ytd-topbar-menu-button-renderer:has(#create)",
+    "ytd-masthead #buttons button[aria-label='Create']",
+    "ytd-masthead #buttons ytd-topbar-menu-button-renderer:has(button[aria-label='Create'])",
+    "#create-button",
+    "#create-button button"
+  ]);
+  const createButton = effectiveBackgroundColor(createButtonElement) || background;
+  const createButtonText = computedColorToHex(createButtonElement ? getComputedStyle(createButtonElement).color : "") || text;
   const recommended = effectiveBackgroundColor(firstMatchingElement(["#secondary", "ytd-watch-next-secondary-results-renderer"])) || background;
   const details = effectiveBackgroundColor(firstMatchingElement(["ytd-watch-metadata", "#below"])) || background;
   const description = "#f2f2f2";
@@ -328,7 +351,7 @@ function sampleBaseColors() {
   if (coloredSubscribeSaved !== undefined) root.dataset.ytcColoredSubscribe = coloredSubscribeSaved;
 
   return {
-    home: { text, background, header, guide, cards, search, searchText, categories, categoryArrows },
+    home: { text, background, header, guide, cards, search, searchText, categories, categoryOptions, categoryArrows, createButton, createButtonText },
     player: { text, background, header, guide, recommended, details, description, comments, subscribe, subscribeText, subscribed, subscribedText }
   };
 }

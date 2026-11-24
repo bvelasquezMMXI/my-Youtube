@@ -219,6 +219,42 @@ html[data-ytc-page="home"][data-ytc-home-colors] :is(
   background-color: var(--ytc-home-category-arrows) !important;
 }
 
+html[data-ytc-page="home"][data-ytc-home-colors] yt-chip-cloud-chip-renderer:not([selected]) .ytChipShapeChip {
+  background-color: var(--ytc-home-category-options) !important;
+}
+
+html[data-ytc-page="home"][data-ytc-home-colors] yt-chip-cloud-chip-renderer:not([selected]) :is(.ytChipShapeChip, .ytChipShapeText) {
+  color: var(--ytc-home-category-options-text) !important;
+}
+
+html[data-ytc-page="home"][data-ytc-home-colors] :is(
+  #create-button,
+  #create-button button,
+  ytd-masthead #buttons button:has(#create),
+  ytd-masthead #buttons ytd-topbar-menu-button-renderer:has(#create),
+  ytd-masthead #buttons button[aria-label="Create"],
+  ytd-masthead #buttons ytd-topbar-menu-button-renderer:has(button[aria-label="Create"])
+) {
+  background-color: var(--ytc-home-create-button) !important;
+  color: var(--ytc-home-create-button-text) !important;
+}
+
+html[data-ytc-page="home"][data-ytc-home-colors] :is(
+  #create-button,
+  #create-button button,
+  ytd-masthead #buttons button:has(#create),
+  ytd-masthead #buttons ytd-topbar-menu-button-renderer:has(#create),
+  ytd-masthead #buttons button[aria-label="Create"],
+  ytd-masthead #buttons ytd-topbar-menu-button-renderer:has(button[aria-label="Create"])
+) :is(
+  span, div, yt-formatted-string, yt-attributed-string, .yt-core-attributed-string,
+  yt-icon, svg, path, circle, rect, polygon, polyline, line, ellipse, g, use
+) {
+  color: var(--ytc-home-create-button-text) !important;
+  fill: var(--ytc-home-create-button-text) !important;
+  stroke: var(--ytc-home-create-button-text) !important;
+}
+
 html[data-ytc-page="watch"][data-ytc-player-colors] :where(
   h1, h2, h3, h4, h5, h6, p, span, a,
   yt-formatted-string, yt-attributed-string, yt-core-attributed-string,

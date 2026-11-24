@@ -41,7 +41,10 @@ const colorScopes = [
       { key: "search", label: "Search bar", fallback: "#ffffff" },
       { key: "searchText", label: "Search bar text", fallback: "#0f0f0f" },
       { key: "categories", label: "Categories", fallback: "#ffffff" },
-      { key: "categoryArrows", label: "Next/back buttons", fallback: "#ffffff" }
+      { key: "categoryOptions", label: "Category options", fallback: "#f2f2f2" },
+      { key: "categoryArrows", label: "Next/back buttons", fallback: "#ffffff" },
+      { key: "createButton", label: "Create button", fallback: "#ffffff" },
+      { key: "createButtonText", label: "Create button text", fallback: "#0f0f0f" }
     ]
   },
   {
@@ -68,6 +71,10 @@ const colorScopes = [
 ];
 const themePresets = [
   {
+    name: "Default",
+    default: true
+  },
+  {
     name: "Midnight Black",
     home: {
       text: "#f1f1f1",
@@ -78,7 +85,10 @@ const themePresets = [
       search: "#0f0f0f",
       searchText: "#f1f1f1",
       categories: "#0f0f0f",
-      categoryArrows: "#0f0f0f"
+      categoryOptions: "#272727",
+      categoryArrows: "#0f0f0f",
+      createButton: "#0f0f0f",
+      createButtonText: "#f1f1f1"
     },
     player: {
       text: "#f1f1f1",
@@ -155,9 +165,23 @@ function buildColorControls() {
   }
 }
 
+function buildPresetTheme(preset) {
+  const theme = {};
+  for (const scope of colorScopes) {
+    const source = preset[scope.prefix];
+    theme[scope.prefix] = { enabled: true };
+    for (const field of scope.fields) {
+      const color = preset.default ? field.fallback : normalizeHexColor(source?.[field.key]);
+      theme[scope.prefix][field.key] = color || field.fallback;
+    }
+  }
+  return theme;
+}
+
 function renderThemePresets() {
   themePresetsContainer.replaceChildren();
   for (const preset of themePresets) {
+    const presetTheme = buildPresetTheme(preset);
     const card = document.createElement("div");
     card.className = "theme-preset";
 
@@ -172,7 +196,7 @@ function renderThemePresets() {
     colors.className = "theme-preset-colors";
     const entries = new Map();
     for (const scope of colorScopes) {
-      const source = preset[scope.prefix];
+      const source = presetTheme[scope.prefix];
       for (const field of scope.fields) {
         const color = normalizeHexColor(source[field.key]);
         if (!color) continue;
@@ -202,14 +226,7 @@ function renderThemePresets() {
     apply.textContent = "Apply";
     apply.disabled = !settingsReady;
     apply.addEventListener("click", () => {
-      const theme = {};
-      for (const scope of colorScopes) {
-        theme[scope.prefix] = { enabled: true };
-        for (const field of scope.fields) {
-          theme[scope.prefix][field.key] = normalizeHexColor(preset[scope.prefix][field.key]) || field.fallback;
-        }
-      }
-      applyTheme(theme);
+      applyTheme(buildPresetTheme(preset));
       themeStatus.textContent = "Applied";
     });
 
@@ -623,6 +640,7 @@ if (localStore?.get) {
 
 requestBaseColors((colors) => {
   applyBaseColorFallbacks(colors);
+  renderThemePresets();
   syncStorage?.get(settingsDefaults, applySettings);
 });
 
