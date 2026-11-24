@@ -22,18 +22,24 @@ restores YouTube's unmodified fonts, while the others apply to all text. The
 **Upload** button beside it accepts woff2/woff/ttf/otf files, stores the font
 locally, injects it with `@font-face`, and appends it to the font list. The
 **Sidebar** subtab mirrors the current YouTube tab's guide, excluding footer
-links. Sections and their entries get checkboxes, and entries are nested under
+links. When the guide is collapsed, the full guide is fetched so every section
+and its entries are listed without expanding the sidebar first. Sections and their entries get checkboxes, and entries are nested under
 their section with directory guides. Child options are hidden while their
 parent is unchecked. Subscriptions gets a single **Hide Subscriptions** child,
 which blurs the subscribed channel names while keeping the rows in place.
 Under **Player → Main**, **Add dislikes** restores dislike counts inside the
 dislike button using the Return YouTube Dislike API. The button widens to fit
-the count; counts are cached by the background service worker. **Colored
-subscribe button** colors the Subscribe button differently while unsubscribed
-and subscribed; each state has an optional hex field and color picker. The two
-color rows appear only while the option is checked. **Remove hashtags** strips
-hashtags from video titles and descriptions on watch pages, cards, and Shorts,
-and hides hashtag links; turning it off restores the original text.
+the count; counts are cached by the background service worker. **Remove
+hashtags** strips hashtags from video titles and descriptions on watch pages,
+cards, and Shorts, and hides hashtag links; turning it off restores the
+original text. **Remove recommended videos** hides the watch page's right
+column and expands the player, description, and comments to the full width.
+Every category has a **Colors** subtab with one **Custom colors** checkbox and
+individual color rows for Text, Background, Header, Guide, and the page's major
+elements: Cards on Home; Recommended, Video details, Comments, and the
+Subscribe button's two states on Player; all of them on Themes. Home colors
+apply only on the Home feed, Player colors only on watch pages, and Themes
+colors on every page.
 
 ## Load unpacked
 

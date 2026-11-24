@@ -131,6 +131,146 @@ html[data-ytc-hover-highlights="off"] .ytSpecTouchFeedbackShapeHoverEffect {
   opacity: 0 !important;
 }
 
+html[data-ytc-no-recommended] ytd-watch-flexy #columns {
+  max-width: none !important;
+}
+
+html[data-ytc-no-recommended] ytd-watch-flexy #secondary {
+  display: none !important;
+}
+
+html[data-ytc-no-recommended] ytd-watch-flexy #primary {
+  max-width: none !important;
+  width: 100% !important;
+}
+
+html[data-ytc-no-recommended] ytd-watch-flexy #player-container-outer {
+  max-width: none !important;
+}
+
+html[data-ytc-page="home"][data-ytc-home-colors] :is(
+  h1, h2, h3, h4, h5, h6, p, span, a,
+  yt-formatted-string, yt-attributed-string, yt-core-attributed-string,
+  .ytAttributedStringHost, .yt-core-attributed-string,
+  #title, #video-title, #description
+) {
+  color: var(--ytc-home-text) !important;
+}
+
+html[data-ytc-page="home"][data-ytc-home-colors] ytd-app {
+  background-color: var(--ytc-home-background) !important;
+}
+
+html[data-ytc-page="home"][data-ytc-home-colors] ytd-masthead {
+  background-color: var(--ytc-home-header) !important;
+}
+
+html[data-ytc-page="home"][data-ytc-home-colors] :is(
+  ytd-guide-renderer, ytd-mini-guide-renderer, #guide-content, #guide-inner-content
+) {
+  background-color: var(--ytc-home-guide) !important;
+}
+
+html[data-ytc-page="home"][data-ytc-home-colors] :is(
+  ytd-rich-grid-renderer, ytd-rich-section-renderer, ytd-rich-item-renderer,
+  ytd-rich-shelf-renderer, yt-lockup-view-model, yt-lockup-metadata-view-model,
+  ytd-feed-filter-chip-bar-renderer, #chips-wrapper,
+  ytd-two-column-browse-results-renderer, ytd-section-list-renderer
+) {
+  background-color: var(--ytc-home-cards) !important;
+}
+
+html[data-ytc-page="watch"][data-ytc-player-colors] :is(
+  h1, h2, h3, h4, h5, h6, p, span, a,
+  yt-formatted-string, yt-attributed-string, yt-core-attributed-string,
+  .ytAttributedStringHost, .yt-core-attributed-string,
+  #title, #video-title, #description
+) {
+  color: var(--ytc-player-text) !important;
+}
+
+html[data-ytc-page="watch"][data-ytc-player-colors] ytd-app {
+  background-color: var(--ytc-player-background) !important;
+}
+
+html[data-ytc-page="watch"][data-ytc-player-colors] ytd-masthead {
+  background-color: var(--ytc-player-header) !important;
+}
+
+html[data-ytc-page="watch"][data-ytc-player-colors] :is(
+  ytd-guide-renderer, ytd-mini-guide-renderer, #guide-content, #guide-inner-content
+) {
+  background-color: var(--ytc-player-guide) !important;
+}
+
+html[data-ytc-page="watch"][data-ytc-player-colors] :is(
+  #secondary, ytd-watch-next-secondary-results-renderer
+) {
+  background-color: var(--ytc-player-recommended) !important;
+}
+
+html[data-ytc-page="watch"][data-ytc-player-colors] :is(
+  ytd-watch-metadata, #below, #description, ytd-text-inline-expander
+) {
+  background-color: var(--ytc-player-details) !important;
+}
+
+html[data-ytc-page="watch"][data-ytc-player-colors] :is(
+  #comments, ytd-comment-thread-renderer, ytd-comment-view-model
+) {
+  background-color: var(--ytc-player-comments) !important;
+}
+
+html[data-ytc-theme-colors] :is(
+  h1, h2, h3, h4, h5, h6, p, span, a,
+  yt-formatted-string, yt-attributed-string, yt-core-attributed-string,
+  .ytAttributedStringHost, .yt-core-attributed-string,
+  #title, #video-title, #description
+) {
+  color: var(--ytc-theme-text) !important;
+}
+
+html[data-ytc-theme-colors] ytd-app {
+  background-color: var(--ytc-theme-background) !important;
+}
+
+html[data-ytc-theme-colors] ytd-masthead {
+  background-color: var(--ytc-theme-header) !important;
+}
+
+html[data-ytc-theme-colors] :is(
+  ytd-guide-renderer, ytd-mini-guide-renderer, #guide-content, #guide-inner-content
+) {
+  background-color: var(--ytc-theme-guide) !important;
+}
+
+html[data-ytc-theme-colors] :is(
+  ytd-rich-grid-renderer, ytd-rich-section-renderer, ytd-rich-item-renderer,
+  ytd-rich-shelf-renderer, yt-lockup-view-model, yt-lockup-metadata-view-model,
+  ytd-feed-filter-chip-bar-renderer, #chips-wrapper,
+  ytd-two-column-browse-results-renderer, ytd-section-list-renderer
+) {
+  background-color: var(--ytc-theme-cards) !important;
+}
+
+html[data-ytc-theme-colors] :is(
+  #secondary, ytd-watch-next-secondary-results-renderer
+) {
+  background-color: var(--ytc-theme-recommended) !important;
+}
+
+html[data-ytc-theme-colors] :is(
+  ytd-watch-metadata, #below, #description, ytd-text-inline-expander
+) {
+  background-color: var(--ytc-theme-details) !important;
+}
+
+html[data-ytc-theme-colors] :is(
+  #comments, ytd-comment-thread-renderer, ytd-comment-view-model
+) {
+  background-color: var(--ytc-theme-comments) !important;
+}
+
 html[data-ytc-font] body,
 html[data-ytc-font] body * {
   font-family: var(--ytc-font) !important;

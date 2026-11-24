@@ -52,9 +52,43 @@ const SUBSCRIPTIONS_SECTION_ATTR = "data-ytc-subscriptions-section";
 const SUBSCRIPTION_NAME_ATTR = "data-ytc-subscription-name";
 const SUBSCRIPTIONS_REDACTED_CLASS = "ytc-subscriptions-redacted";
 const SUBSCRIPTION_HIDE_KEY = "subscriptions:hide-names";
+const GUIDE_TREE_TTL = 10 * 60 * 1000;
+const GUIDE_FETCH_BACKOFF = 60 * 1000;
+const COLOR_SCOPE_PREFIXES = ["home", "player", "theme"];
+const COLOR_FIELDS = {
+  home: {
+    text: "#0f0f0f",
+    background: "#ffffff",
+    header: "#ffffff",
+    guide: "#ffffff",
+    cards: "#ffffff"
+  },
+  player: {
+    text: "#0f0f0f",
+    background: "#ffffff",
+    header: "#ffffff",
+    guide: "#ffffff",
+    recommended: "#ffffff",
+    details: "#ffffff",
+    comments: "#ffffff",
+    subscribe: "#cc0000",
+    subscribed: "#606060"
+  },
+  theme: {
+    text: "#0f0f0f",
+    background: "#ffffff",
+    header: "#ffffff",
+    guide: "#ffffff",
+    cards: "#ffffff",
+    recommended: "#ffffff",
+    details: "#ffffff",
+    comments: "#ffffff"
+  }
+};
 let currentVideosPerRow = DEFAULT_VIDEOS_PER_ROW;
 let currentUiRadius = DEFAULT_UI_RADIUS;
 let currentHoverHighlights = true;
+let removeRecommendedEnabled = false;
 let currentFontFamily = "";
 let noAISetting = false;
 let removeHashtagsEnabled = false;
@@ -62,6 +96,16 @@ let hashtagTextOriginals = new Map();
 let introStyle = null;
 let sidebarHiddenKeys = new Set();
 let lastSidebarTreeJSON = "";
+let guideTreeCache = null;
+let guideTreeCacheTime = 0;
+let guideFetchPending = false;
+let guideFetchAttempt = 0;
+let innertubeConfigCache = null;
+const colorStates = {
+  home: { enabled: false, ...COLOR_FIELDS.home },
+  player: { enabled: false, ...COLOR_FIELDS.player },
+  theme: { enabled: false, ...COLOR_FIELDS.theme }
+};
 let addDislikesEnabled = false;
 let dislikeVideoId = "";
 let dislikeCount = null;
@@ -117,6 +161,52 @@ function applyHoverHighlights(value) {
   const root = document.documentElement;
   if (currentHoverHighlights) delete root.dataset.ytcHoverHighlights;
   else root.dataset.ytcHoverHighlights = "off";
+}
+
+function applyRemoveRecommended(value) {
+  const enabled = Boolean(value);
+  const changed = enabled !== removeRecommendedEnabled;
+  removeRecommendedEnabled = enabled;
+
+  const root = document.documentElement;
+  if (enabled) root.dataset.ytcNoRecommended = "1";
+  else delete root.dataset.ytcNoRecommended;
+
+  // The player only recomputes its video size on a resize.
+  if (changed) window.dispatchEvent(new Event("resize"));
+}
+
+function applyPageColors(prefix) {
+  const root = document.documentElement;
+  const state = colorStates[prefix];
+  const attr = `ytc${prefix.charAt(0).toUpperCase()}${prefix.slice(1)}Colors`;
+
+  if (state.enabled) {
+    root.dataset[attr] = "1";
+    for (const [key, fallback] of Object.entries(COLOR_FIELDS[prefix])) {
+      root.style.setProperty(`--ytc-${prefix}-${key}`, state[key] || fallback);
+    }
+  } else {
+    delete root.dataset[attr];
+    for (const key of Object.keys(COLOR_FIELDS[prefix])) {
+      root.style.removeProperty(`--ytc-${prefix}-${key}`);
+    }
+  }
+
+  if (prefix === "player") {
+    applyColoredSubscribe(state.enabled, state.subscribe, state.subscribed);
+  }
+}
+
+function syncPageKind() {
+  const root = document.documentElement;
+  if (location.pathname === "/watch") {
+    root.dataset.ytcPage = "watch";
+  } else if (location.pathname === "/") {
+    root.dataset.ytcPage = "home";
+  } else {
+    delete root.dataset.ytcPage;
+  }
 }
 
 function markNoRadiusElements() {
@@ -714,6 +804,172 @@ function buildSidebarTree() {
   return tree;
 }
 
+function guideDataTitle(payload) {
+  const title = payload?.formattedTitle?.simpleText ||
+    payload?.title?.simpleText ||
+    (Array.isArray(payload?.title?.runs) ? payload.title.runs.map((run) => run.text || "").join("") : "");
+  return normalizeSidebarText(title);
+}
+
+function guideDataHref(payload) {
+  return payload?.navigationEndpoint?.commandMetadata?.webCommandMetadata?.url ||
+    payload?.endpoint?.commandMetadata?.webCommandMetadata?.url || "";
+}
+
+function collectGuideDataEntries(section) {
+  const entries = [];
+  const add = (entry) => {
+    if (!entry) return;
+    const title = guideDataTitle(entry);
+    if (!title || /^show (?:more|less)$/i.test(title)) return;
+    entries.push({ title, href: guideDataHref(entry) });
+  };
+
+  for (const item of Array.isArray(section?.items) ? section.items : []) {
+    if (item.guideEntryRenderer) {
+      add(item.guideEntryRenderer);
+    } else if (item.guideCollapsibleEntryRenderer) {
+      for (const child of item.guideCollapsibleEntryRenderer.expandableItems || []) {
+        add(child.guideEntryRenderer);
+      }
+    }
+  }
+  return entries;
+}
+
+function buildGuideTreeFromData(items) {
+  const tree = [];
+  const usedKeys = new Set();
+  let seenTitled = false;
+
+  for (const item of Array.isArray(items) ? items : []) {
+    const section = item?.guideSectionRenderer;
+    if (!section) continue;
+
+    const title = guideDataTitle(section);
+    // Untitled sections after the first titled one are the footer links.
+    if (!title && seenTitled) continue;
+    if (title) seenTitled = true;
+
+    if (!title) {
+      for (const entry of collectGuideDataEntries(section)) {
+        const key = uniqueSidebarKey(usedKeys, `entry:top|${entry.href || sidebarKeyText(entry.title)}`);
+        addSidebarItem(tree, { key, title: entry.title, children: [] });
+      }
+      continue;
+    }
+
+    const key = uniqueSidebarKey(usedKeys, `section:${sidebarKeyText(title)}`);
+    if (/^subscriptions$/i.test(title)) {
+      addSidebarItem(tree, {
+        key,
+        title,
+        children: [{
+          key: SUBSCRIPTION_HIDE_KEY,
+          title: "Hide Subscriptions",
+          children: [],
+          inverted: true
+        }]
+      });
+      continue;
+    }
+
+    const children = [];
+    for (const entry of collectGuideDataEntries(section)) {
+      const childKey = uniqueSidebarKey(usedKeys, `entry:${key}|${entry.href || sidebarKeyText(entry.title)}`);
+      children.push({ key: childKey, title: entry.title, children: [] });
+    }
+    addSidebarItem(tree, { key, title, children });
+  }
+
+  return tree;
+}
+
+function readInnertubeConfig() {
+  if (innertubeConfigCache) return innertubeConfigCache;
+
+  for (const script of document.querySelectorAll("script")) {
+    const text = script.textContent || "";
+    if (!text.includes('"INNERTUBE_API_KEY"')) continue;
+
+    const marker = "ytcfg.set(";
+    let start = text.indexOf(marker);
+    while (start !== -1 && text[start + marker.length] !== "{") {
+      start = text.indexOf(marker, start + marker.length);
+    }
+    if (start === -1) continue;
+
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    for (let index = start + marker.length; index < text.length; index += 1) {
+      const char = text[index];
+      if (inString) {
+        if (escaped) escaped = false;
+        else if (char === "\\") escaped = true;
+        else if (char === '"') inString = false;
+        continue;
+      }
+      if (char === '"') {
+        inString = true;
+        continue;
+      }
+      if (char === "{") depth += 1;
+      else if (char === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          try {
+            innertubeConfigCache = JSON.parse(text.slice(start + marker.length, index + 1));
+            return innertubeConfigCache;
+          } catch (error) {
+            break;
+          }
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function needsFullGuide() {
+  if (location.pathname.startsWith("/embed/") || location.pathname.startsWith("/live_chat")) return false;
+  return Boolean(document.querySelector("ytd-app[mini-guide-visible]")) ||
+    !document.querySelector("ytd-guide-renderer");
+}
+
+function fetchGuideTree() {
+  if (guideFetchPending) return;
+  if (Date.now() - guideTreeCacheTime < GUIDE_TREE_TTL) return;
+  if (Date.now() - guideFetchAttempt < GUIDE_FETCH_BACKOFF) return;
+
+  const config = readInnertubeConfig();
+  if (!config?.INNERTUBE_API_KEY || !config?.INNERTUBE_CONTEXT) return;
+
+  guideFetchPending = true;
+  guideFetchAttempt = Date.now();
+
+  fetch(`/youtubei/v1/guide?key=${encodeURIComponent(config.INNERTUBE_API_KEY)}&prettyPrint=false`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ context: config.INNERTUBE_CONTEXT })
+  })
+    .then((response) => (response.ok ? response.json() : null))
+    .then((data) => {
+      const tree = buildGuideTreeFromData(data?.items);
+      if (!tree.length) return;
+      guideTreeCache = tree;
+      guideTreeCacheTime = Date.now();
+      lastSidebarTreeJSON = "";
+      syncSidebar();
+    })
+    .catch(() => {
+      // Keep the DOM-derived tree when the guide request fails.
+    })
+    .finally(() => {
+      guideFetchPending = false;
+    });
+}
+
 function applySidebarHidden() {
   for (const node of document.querySelectorAll(`[${SIDEBAR_KEY_ATTR}]`)) {
     const key = node.getAttribute(SIDEBAR_KEY_ATTR);
@@ -727,8 +983,16 @@ function applySidebarHidden() {
 }
 
 function syncSidebar() {
-  const tree = buildSidebarTree();
+  const domTree = buildSidebarTree();
   applySidebarHidden();
+
+  const fullGuide = needsFullGuide();
+  const useCachedGuide = Boolean(guideTreeCache) &&
+    Date.now() - guideTreeCacheTime < GUIDE_TREE_TTL &&
+    fullGuide;
+  const tree = useCachedGuide ? guideTreeCache : domTree;
+
+  if (!useCachedGuide && fullGuide) fetchGuideTree();
 
   const json = JSON.stringify(tree);
   if (json === lastSidebarTreeJSON) return;
@@ -876,6 +1140,7 @@ function scheduleItemSync() {
     syncDislikes();
     syncSubscribeButtons();
     applyRemoveHashtags(removeHashtagsEnabled);
+    syncPageKind();
   }, 300);
 }
 
@@ -922,6 +1187,8 @@ for (const eventName of ["yt-navigate-finish", "yt-page-data-updated", "popstate
     syncDislikes();
     syncSubscribeButtons();
     applyRemoveHashtags(removeHashtagsEnabled);
+    syncPageKind();
+    if (removeRecommendedEnabled) window.dispatchEvent(new Event("resize"));
   });
 }
 
@@ -950,12 +1217,22 @@ function applySyncSettings(settings) {
   applyNoAI(settings.noAI);
   syncSidebar();
   applyAddDislikes(settings.addDislikes !== false);
-  applyColoredSubscribe(settings.coloredSubscribe !== false, settings.subscribeColor, settings.subscribedColor);
   applyRemoveHashtags(settings.removeHashtags);
+  applyRemoveRecommended(settings.removeRecommended);
+  for (const prefix of COLOR_SCOPE_PREFIXES) {
+    const stored = settings[`${prefix}Colors`] || {};
+    const state = { enabled: Boolean(stored.enabled) };
+    for (const [key, fallback] of Object.entries(COLOR_FIELDS[prefix])) {
+      state[key] = normalizeSubscribeColor(stored[key], fallback);
+    }
+    colorStates[prefix] = state;
+    applyPageColors(prefix);
+  }
+  syncPageKind();
 }
 
 function loadSyncSettings() {
-  globalThis.chrome?.storage?.sync?.get({ videosPerRow: DEFAULT_VIDEOS_PER_ROW, uiRadius: DEFAULT_UI_RADIUS, noAI: false, hoverHighlights: true, addDislikes: true, coloredSubscribe: true, subscribeColor: DEFAULT_SUBSCRIBE_COLOR, subscribedColor: DEFAULT_SUBSCRIBED_COLOR, fontFamily: "", removeHashtags: false }, applySyncSettings);
+  globalThis.chrome?.storage?.sync?.get({ videosPerRow: DEFAULT_VIDEOS_PER_ROW, uiRadius: DEFAULT_UI_RADIUS, noAI: false, hoverHighlights: true, addDislikes: true, fontFamily: "", removeHashtags: false, removeRecommended: false, homeColors: { enabled: false, ...COLOR_FIELDS.home }, playerColors: { enabled: false, ...COLOR_FIELDS.player }, themeColors: { enabled: false, ...COLOR_FIELDS.theme } }, applySyncSettings);
 }
 
 loadLocalSettings();
@@ -994,18 +1271,23 @@ chrome.storage.onChanged.addListener((changes, area) => {
     return;
   }
   if (area !== "sync") return;
+  for (const prefix of COLOR_SCOPE_PREFIXES) {
+    const key = `${prefix}Colors`;
+    if (!changes[key]) continue;
+    const stored = changes[key].newValue || {};
+    const state = { enabled: Boolean(stored.enabled) };
+    for (const [field, fallback] of Object.entries(COLOR_FIELDS[prefix])) {
+      state[field] = normalizeSubscribeColor(stored[field], fallback);
+    }
+    colorStates[prefix] = state;
+    applyPageColors(prefix);
+  }
   if (changes.videosPerRow) applyVideosPerRow(changes.videosPerRow.newValue);
   if (changes.uiRadius) applyUiRadius(changes.uiRadius.newValue);
   if (changes.hoverHighlights) applyHoverHighlights(changes.hoverHighlights.newValue);
   if (changes.fontFamily) applyFontFamily(changes.fontFamily.newValue);
   if (changes.noAI) applyNoAI(changes.noAI.newValue);
   if (changes.removeHashtags) applyRemoveHashtags(changes.removeHashtags.newValue);
+  if (changes.removeRecommended) applyRemoveRecommended(changes.removeRecommended.newValue);
   if (changes.addDislikes) applyAddDislikes(changes.addDislikes.newValue);
-  if (changes.coloredSubscribe || changes.subscribeColor || changes.subscribedColor) {
-    applyColoredSubscribe(
-      changes.coloredSubscribe ? changes.coloredSubscribe.newValue !== false : coloredSubscribeEnabled,
-      changes.subscribeColor ? changes.subscribeColor.newValue : subscribeButtonColor,
-      changes.subscribedColor ? changes.subscribedColor.newValue : subscribedButtonColor
-    );
-  }
 });

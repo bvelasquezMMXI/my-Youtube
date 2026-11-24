@@ -21,19 +21,137 @@ const sidebarTree = document.getElementById("sidebar-tree");
 const sidebarEmpty = document.getElementById("sidebar-empty");
 const addDislikesOption = document.getElementById("add-dislikes");
 const addDislikesCheckbox = document.getElementById("add-dislikes-checkbox");
-const coloredSubscribeOption = document.getElementById("colored-subscribe");
-const coloredSubscribeCheckbox = document.getElementById("colored-subscribe-checkbox");
-const subscribeColorsOption = document.getElementById("subscribe-colors");
-const subscribeColorHex = document.getElementById("subscribe-color-hex");
-const subscribeColorPicker = document.getElementById("subscribe-color-picker");
-const subscribedColorHex = document.getElementById("subscribed-color-hex");
-const subscribedColorPicker = document.getElementById("subscribed-color-picker");
 const removeHashtagsOption = document.getElementById("remove-hashtags");
 const removeHashtagsCheckbox = document.getElementById("remove-hashtags-checkbox");
+const noRecommendedOption = document.getElementById("no-recommended");
+const noRecommendedCheckbox = document.getElementById("no-recommended-checkbox");
+const colorScopes = [
+  {
+    prefix: "home",
+    label: "Home",
+    option: document.getElementById("home-colors"),
+    checkbox: document.getElementById("home-colors-checkbox"),
+    suboptions: document.getElementById("home-color-options"),
+    fields: [
+      { key: "text", label: "Text", fallback: "#0f0f0f" },
+      { key: "background", label: "Background", fallback: "#ffffff" },
+      { key: "header", label: "Header", fallback: "#ffffff" },
+      { key: "guide", label: "Guide", fallback: "#ffffff" },
+      { key: "cards", label: "Cards", fallback: "#ffffff" }
+    ]
+  },
+  {
+    prefix: "player",
+    label: "Player",
+    option: document.getElementById("player-colors"),
+    checkbox: document.getElementById("player-colors-checkbox"),
+    suboptions: document.getElementById("player-color-options"),
+    fields: [
+      { key: "text", label: "Text", fallback: "#0f0f0f" },
+      { key: "background", label: "Background", fallback: "#ffffff" },
+      { key: "header", label: "Header", fallback: "#ffffff" },
+      { key: "guide", label: "Guide", fallback: "#ffffff" },
+      { key: "recommended", label: "Recommended", fallback: "#ffffff" },
+      { key: "details", label: "Video details", fallback: "#ffffff" },
+      { key: "comments", label: "Comments", fallback: "#ffffff" },
+      { key: "subscribe", label: "Subscribe (not subscribed)", fallback: "#cc0000" },
+      { key: "subscribed", label: "Subscribe (subscribed)", fallback: "#606060" }
+    ]
+  },
+  {
+    prefix: "theme",
+    label: "Themes",
+    option: document.getElementById("theme-colors"),
+    checkbox: document.getElementById("theme-colors-checkbox"),
+    suboptions: document.getElementById("theme-color-options"),
+    fields: [
+      { key: "text", label: "Text", fallback: "#0f0f0f" },
+      { key: "background", label: "Background", fallback: "#ffffff" },
+      { key: "header", label: "Header", fallback: "#ffffff" },
+      { key: "guide", label: "Guide", fallback: "#ffffff" },
+      { key: "cards", label: "Cards", fallback: "#ffffff" },
+      { key: "recommended", label: "Recommended", fallback: "#ffffff" },
+      { key: "details", label: "Video details", fallback: "#ffffff" },
+      { key: "comments", label: "Comments", fallback: "#ffffff" }
+    ]
+  }
+];
 const syncStorage = globalThis.chrome?.storage?.sync;
 const localStore = globalThis.chrome?.storage?.local;
 let sidebarItems = [];
 let sidebarHidden = new Set();
+const colorState = {};
+
+function colorScopeDefaults(scope) {
+  const defaults = { enabled: false };
+  for (const field of scope.fields) defaults[field.key] = field.fallback;
+  return defaults;
+}
+
+function buildColorControls() {
+  for (const scope of colorScopes) {
+    for (const field of scope.fields) {
+      const id = `${scope.prefix}-${field.key}-color`;
+      const row = document.createElement("div");
+      row.className = "option option-color";
+
+      const label = document.createElement("label");
+      label.className = "option-label";
+      label.htmlFor = `${id}-hex`;
+      label.textContent = field.label;
+
+      const hex = document.createElement("input");
+      hex.className = "option-hex";
+      hex.id = `${id}-hex`;
+      hex.type = "text";
+      hex.value = field.fallback;
+      hex.maxLength = 7;
+      hex.spellcheck = false;
+      hex.setAttribute("aria-label", `${scope.label} ${field.label} color`);
+
+      const picker = document.createElement("input");
+      picker.className = "option-swatch";
+      picker.id = `${id}-picker`;
+      picker.type = "color";
+      picker.value = field.fallback;
+      picker.setAttribute("aria-label", `${scope.label} ${field.label} color picker`);
+
+      row.append(label, hex, picker);
+      scope.suboptions.append(row);
+      field.hex = hex;
+      field.picker = picker;
+    }
+  }
+}
+
+function bindScopeColor(scope, field) {
+  const save = (color) => {
+    colorState[scope.prefix][field.key] = color;
+    saveSync({ [`${scope.prefix}Colors`]: { ...colorState[scope.prefix] } });
+  };
+
+  field.picker.addEventListener("input", () => {
+    const color = normalizeHexColor(field.picker.value);
+    if (!color) return;
+    field.hex.value = color;
+    save(color);
+  });
+
+  field.hex.addEventListener("input", () => {
+    const color = normalizeHexColor(field.hex.value);
+    if (!color) return;
+    field.picker.value = color;
+    save(color);
+  });
+
+  field.hex.addEventListener("change", () => {
+    const color = normalizeHexColor(field.hex.value) || normalizeHexColor(field.picker.value) || field.fallback;
+    field.hex.value = color;
+    field.picker.value = color;
+    save(color);
+  });
+}
+
 let lastYouTubePing = 0;
 let lastYouTubeReload = 0;
 
@@ -203,33 +321,10 @@ function setColorInputs(hexInput, picker, value, fallback) {
   picker.value = color;
 }
 
-function bindColorControls(hexInput, picker, key) {
-  picker.addEventListener("input", () => {
-    const color = normalizeHexColor(picker.value);
-    if (!color) return;
-    hexInput.value = color;
-    saveSync({ [key]: color });
-  });
-
-  hexInput.addEventListener("input", () => {
-    const color = normalizeHexColor(hexInput.value);
-    if (!color) return;
-    picker.value = color;
-    saveSync({ [key]: color });
-  });
-
-  hexInput.addEventListener("change", () => {
-    const fallback = key === "subscribeColor" ? "#cc0000" : "#606060";
-    const color = normalizeHexColor(hexInput.value) || normalizeHexColor(picker.value) || fallback;
-    hexInput.value = color;
-    picker.value = color;
-    saveSync({ [key]: color });
-  });
-}
-
-function updateColorOptionVisibility() {
-  const show = !coloredSubscribeOption.hidden && coloredSubscribeCheckbox.checked;
-  subscribeColorsOption.hidden = !show;
+function updatePageColorVisibility() {
+  for (const scope of colorScopes) {
+    scope.suboptions.hidden = scope.option.hidden || !scope.checkbox.checked;
+  }
 }
 
 function applySettings(settings) {
@@ -242,11 +337,21 @@ function applySettings(settings) {
   noAICheckbox.checked = Boolean(settings.noAI);
   hoverCheckbox.checked = settings.hoverHighlights !== false;
   addDislikesCheckbox.checked = settings.addDislikes !== false;
-  coloredSubscribeCheckbox.checked = settings.coloredSubscribe !== false;
   removeHashtagsCheckbox.checked = Boolean(settings.removeHashtags);
-  setColorInputs(subscribeColorHex, subscribeColorPicker, settings.subscribeColor, "#cc0000");
-  setColorInputs(subscribedColorHex, subscribedColorPicker, settings.subscribedColor, "#606060");
-  updateColorOptionVisibility();
+  noRecommendedCheckbox.checked = Boolean(settings.removeRecommended);
+  for (const scope of colorScopes) {
+    const stored = settings[`${scope.prefix}Colors`] || {};
+    const state = colorScopeDefaults(scope);
+    state.enabled = Boolean(stored.enabled);
+    for (const field of scope.fields) {
+      const color = normalizeHexColor(stored[field.key]) || field.fallback;
+      state[field.key] = color;
+      setColorInputs(field.hex, field.picker, color, field.fallback);
+    }
+    colorState[scope.prefix] = state;
+    scope.checkbox.checked = state.enabled;
+  }
+  updatePageColorVisibility();
   fontSelect.value = settings.fontFamily || "";
   if (fontSelect.selectedIndex === -1) fontSelect.value = "";
 }
@@ -257,14 +362,26 @@ const settingsDefaults = {
   noAI: false,
   hoverHighlights: true,
   addDislikes: true,
-  coloredSubscribe: true,
   removeHashtags: false,
-  subscribeColor: "#cc0000",
-  subscribedColor: "#606060",
+  removeRecommended: false,
+  homeColors: colorScopeDefaults(colorScopes[0]),
+  playerColors: colorScopeDefaults(colorScopes[1]),
+  themeColors: colorScopeDefaults(colorScopes[2]),
   fontFamily: ""
 };
 
 renderSidebarTree();
+buildColorControls();
+for (const scope of colorScopes) {
+  colorState[scope.prefix] = colorScopeDefaults(scope);
+  scope.checkbox.addEventListener("change", () => {
+    const state = colorState[scope.prefix];
+    state.enabled = scope.checkbox.checked;
+    saveSync({ [`${scope.prefix}Colors`]: { ...state } });
+    updatePageColorVisibility();
+  });
+  for (const field of scope.fields) bindScopeColor(scope, field);
+}
 
 if (localStore?.get) {
   localStore.get({ customFonts: [], sidebarTree: [], sidebarHidden: [] }, (local) => {
@@ -368,17 +485,13 @@ addDislikesCheckbox.addEventListener("change", () => {
   saveSync({ addDislikes: addDislikesCheckbox.checked });
 });
 
-coloredSubscribeCheckbox.addEventListener("change", () => {
-  saveSync({ coloredSubscribe: coloredSubscribeCheckbox.checked });
-  updateColorOptionVisibility();
-});
-
 removeHashtagsCheckbox.addEventListener("change", () => {
   saveSync({ removeHashtags: removeHashtagsCheckbox.checked });
 });
 
-bindColorControls(subscribeColorHex, subscribeColorPicker, "subscribeColor");
-bindColorControls(subscribedColorHex, subscribedColorPicker, "subscribedColor");
+noRecommendedCheckbox.addEventListener("change", () => {
+  saveSync({ removeRecommended: noRecommendedCheckbox.checked });
+});
 
 fontSelect.addEventListener("change", () => {
   saveSync({ fontFamily: fontSelect.value });
@@ -437,9 +550,15 @@ function selectSubtab(tab) {
 
   const onHome = tab.dataset.category === "tab-home";
   const onPlayer = tab.dataset.category === "tab-player";
+  const onThemes = tab.dataset.category === "tab-themes";
   const hasMainOptions = onHome && tab.dataset.label === "Main";
   const hasSidebarOptions = onHome && tab.dataset.label === "Sidebar";
   const hasPlayerMainOptions = onPlayer && tab.dataset.label === "Main";
+  const colorsVisible = {
+    home: onHome && tab.dataset.label === "Colors",
+    player: onPlayer && tab.dataset.label === "Colors",
+    theme: onThemes && tab.dataset.label === "Colors"
+  };
   videosPerRow.hidden = !hasMainOptions;
   cornerOption.hidden = !hasMainOptions;
   noAIOption.hidden = !hasMainOptions;
@@ -447,15 +566,30 @@ function selectSubtab(tab) {
   fontOption.hidden = !hasMainOptions;
   sidebarOptions.hidden = !hasSidebarOptions;
   addDislikesOption.hidden = !hasPlayerMainOptions;
-  coloredSubscribeOption.hidden = !hasPlayerMainOptions;
   removeHashtagsOption.hidden = !hasPlayerMainOptions;
-  updateColorOptionVisibility();
-  panelEmpty.hidden = hasMainOptions || hasSidebarOptions || hasPlayerMainOptions;
+  noRecommendedOption.hidden = !hasPlayerMainOptions;
+  for (const scope of colorScopes) scope.option.hidden = !colorsVisible[scope.prefix];
+  updatePageColorVisibility();
+  panelEmpty.hidden = hasMainOptions || hasSidebarOptions || hasPlayerMainOptions ||
+    colorsVisible.home || colorsVisible.player || colorsVisible.theme;
 }
 
 function renderSubtabs(category) {
-  const labels = category.dataset.subtabs.split("|");
+  const labels = (category.dataset.subtabs || "").split("|").filter(Boolean);
   subtabList.replaceChildren();
+
+  if (!labels.length) {
+    subtabList.hidden = true;
+    for (const option of panel.querySelectorAll(":scope > .option, :scope > .color-suboptions, :scope > #sidebar-options")) {
+      option.hidden = true;
+    }
+    panel.setAttribute("aria-labelledby", category.id);
+    panelEmpty.textContent = `No ${category.textContent} settings yet.`;
+    panelEmpty.hidden = false;
+    return;
+  }
+
+  subtabList.hidden = false;
   subtabList.setAttribute("aria-label", `${category.textContent} options`);
 
   labels.forEach((label, index) => {

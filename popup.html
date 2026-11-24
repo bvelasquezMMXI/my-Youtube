@@ -66,39 +66,46 @@
           <span>Add dislikes</span>
         </label>
       </div>
-      <div class="option option-toggle" id="colored-subscribe" hidden>
-        <label class="option-label" for="colored-subscribe-checkbox">
-          <input class="option-check" id="colored-subscribe-checkbox" type="checkbox" checked>
-          <span>Colored subscribe button</span>
-        </label>
-      </div>
-      <div class="color-suboptions" id="subscribe-colors" hidden>
-        <div class="option option-color" id="subscribe-color">
-          <label class="option-label" for="subscribe-color-hex">Not subscribed</label>
-          <input class="option-hex" id="subscribe-color-hex" type="text" value="#cc0000" maxlength="7" spellcheck="false" aria-label="Not subscribed hex color">
-          <input class="option-swatch" id="subscribe-color-picker" type="color" value="#cc0000" aria-label="Not subscribed color picker">
-        </div>
-        <div class="option option-color" id="subscribed-color">
-          <label class="option-label" for="subscribed-color-hex">Subscribed</label>
-          <input class="option-hex" id="subscribed-color-hex" type="text" value="#606060" maxlength="7" spellcheck="false" aria-label="Subscribed hex color">
-          <input class="option-swatch" id="subscribed-color-picker" type="color" value="#606060" aria-label="Subscribed color picker">
-        </div>
-      </div>
       <div class="option option-toggle" id="remove-hashtags" hidden>
         <label class="option-label" for="remove-hashtags-checkbox">
           <input class="option-check" id="remove-hashtags-checkbox" type="checkbox">
           <span>Remove hashtags</span>
         </label>
       </div>
+      <div class="option option-toggle" id="no-recommended" hidden>
+        <label class="option-label" for="no-recommended-checkbox">
+          <input class="option-check" id="no-recommended-checkbox" type="checkbox">
+          <span>Remove recommended videos</span>
+        </label>
+      </div>
+      <div class="option option-toggle" id="home-colors" hidden>
+        <label class="option-label" for="home-colors-checkbox">
+          <input class="option-check" id="home-colors-checkbox" type="checkbox">
+          <span>Custom colors</span>
+        </label>
+      </div>
+      <div class="color-suboptions" id="home-color-options" hidden></div>
+      <div class="option option-toggle" id="player-colors" hidden>
+        <label class="option-label" for="player-colors-checkbox">
+          <input class="option-check" id="player-colors-checkbox" type="checkbox">
+          <span>Custom colors</span>
+        </label>
+      </div>
+      <div class="color-suboptions" id="player-color-options" hidden></div>
+      <div class="option option-toggle" id="theme-colors" hidden>
+        <label class="option-label" for="theme-colors-checkbox">
+          <input class="option-check" id="theme-colors-checkbox" type="checkbox">
+          <span>Custom colors</span>
+        </label>
+      </div>
+      <div class="color-suboptions" id="theme-color-options" hidden></div>
     </section>
   </main>
 
   <aside class="sidebar" role="tablist" aria-orientation="vertical" aria-label="Modification categories">
-    <button class="tab" id="tab-home" type="button" role="tab" aria-controls="panel" data-subtabs="Main|Sidebar" aria-selected="true">Home</button>
-    <button class="tab" id="tab-player" type="button" role="tab" aria-controls="panel" data-subtabs="Main|Autoplay|Controls" aria-selected="false">Player</button>
-    <button class="tab" id="tab-comments" type="button" role="tab" aria-controls="panel" data-subtabs="Visibility|Sort|Replies" aria-selected="false">Comments</button>
-    <button class="tab" id="tab-shorts" type="button" role="tab" aria-controls="panel" data-subtabs="Shelves|Nav" aria-selected="false">Shorts</button>
-    <button class="tab" id="tab-search" type="button" role="tab" aria-controls="panel" data-subtabs="Results|Suggestions" aria-selected="false">Search</button>
+    <button class="tab" id="tab-home" type="button" role="tab" aria-controls="panel" data-subtabs="Main|Sidebar|Colors" aria-selected="true">Home</button>
+    <button class="tab" id="tab-player" type="button" role="tab" aria-controls="panel" data-subtabs="Main|Autoplay|Controls|Colors" aria-selected="false">Player</button>
+    <button class="tab" id="tab-themes" type="button" role="tab" aria-controls="panel" data-subtabs="Colors" aria-selected="false">Themes</button>
   </aside>
 
   <script src="popup.js"></script>
