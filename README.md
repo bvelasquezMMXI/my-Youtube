@@ -35,13 +35,6 @@ cards, and Shorts, and hides hashtag links; turning it off restores the
 original text. **Remove recommended videos** hides the watch page's right
 column and expands the player, description, and comments to the full width.
 
-## Load unpacked
-
-1. Open `helium://extensions` (or `chrome://extensions` in Chromium).
-2. Enable **Developer mode**.
-3. Click **Load unpacked** and select this folder.
-4. Pin the extension and open its popup.
-
 ## Structure
 
 ```
