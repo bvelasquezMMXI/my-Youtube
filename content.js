@@ -44,6 +44,49 @@ const NO_RADIUS_SELECTOR = [
   "yt-thumbnail-overlay-progress-bar",
   ".ytd-thumbnail-overlay-resume-playback-renderer"
 ].join(", ");
+const HOME_COLOR_STYLE_ID = "ytc-home-colors";
+const ASK_BUTTON_CLASS = "ytc-ask-button";
+const ASK_BUTTON_SELECTOR = ".ytc-ask-button, .ytc-ask-button button";
+const CHIP_OPTION_SCOPE = "ytd-feed-filter-chip-bar-renderer yt-chip-cloud-chip-renderer:not([selected]):not(.iron-selected)";
+const HOME_COLOR_RULES = {
+  searchBar: [["yt-searchbox .ytSearchboxComponentInputBox", "background-color"]],
+  "searchBar.text": [
+    ["yt-searchbox input.ytSearchboxComponentInput", "color"],
+    ["yt-searchbox input.ytSearchboxComponentInput::placeholder", "color"]
+  ],
+  searchButton: [["yt-searchbox button.ytSearchboxComponentSearchButton", "background-color"]],
+  "searchButton.decal": [["yt-searchbox button.ytSearchboxComponentSearchButton", "color"]],
+  askButton: [[ASK_BUTTON_SELECTOR, "background-color"]],
+  "askButton.text": [[ASK_BUTTON_SELECTOR, "color"]],
+  micButton: [["#voice-search-button, #voice-search-button button", "background-color"]],
+  "micButton.decal": [["#voice-search-button button", "color"]],
+  filterBar: [["#chips-wrapper", "background-color"]],
+  "filterBar.options": [[`${CHIP_OPTION_SCOPE} .ytChipShapeChip`, "background-color"]],
+  "filterBar.options.text": [[`${CHIP_OPTION_SCOPE} .ytChipShapeText, ${CHIP_OPTION_SCOPE} .ytChipShapeChip`, "color"]],
+  video: [["ytd-rich-item-renderer :is(yt-lockup-view-model, ytd-video-renderer)", "background-color"]],
+  "video.title": [["ytd-rich-item-renderer .ytLockupMetadataViewModelTitle, ytd-rich-item-renderer #video-title", "color"]],
+  "video.meta": [["ytd-rich-item-renderer .ytContentMetadataViewModelMetadataText, ytd-rich-item-renderer #metadata-line", "color"]],
+  "video.length": [["ytd-rich-item-renderer .ytBadgeShapeThumbnailBadge", "background-color"]],
+  "video.length.text": [["ytd-rich-item-renderer .ytBadgeShapeThumbnailBadge .ytBadgeShapeText", "color"]]
+};
+const HOME_COLOR_SAMPLE_RULES = {
+  searchBar: ["yt-searchbox .ytSearchboxComponentInputBox", "backgroundColor"],
+  "searchBar.text": ["yt-searchbox input.ytSearchboxComponentInput", "color"],
+  searchButton: ["yt-searchbox button.ytSearchboxComponentSearchButton", "backgroundColor"],
+  "searchButton.decal": ["yt-searchbox button.ytSearchboxComponentSearchButton", "color"],
+  askButton: [ASK_BUTTON_SELECTOR, "backgroundColor"],
+  "askButton.text": [ASK_BUTTON_SELECTOR, "color"],
+  micButton: ["#voice-search-button", "backgroundColor"],
+  "micButton.decal": ["#voice-search-button button", "color"],
+  filterBar: ["#chips-wrapper", "backgroundColor"],
+  "filterBar.options": [`${CHIP_OPTION_SCOPE} .ytChipShapeChip`, "backgroundColor"],
+  "filterBar.options.text": [`${CHIP_OPTION_SCOPE} .ytChipShapeText`, "color"],
+  video: ["ytd-rich-item-renderer :is(yt-lockup-view-model, ytd-video-renderer)", "backgroundColor"],
+  "video.title": ["ytd-rich-item-renderer .ytLockupMetadataViewModelTitle, ytd-rich-item-renderer #video-title", "color"],
+  "video.meta": ["ytd-rich-item-renderer .ytContentMetadataViewModelMetadataText, ytd-rich-item-renderer #metadata-line", "color"],
+  "video.length": ["ytd-rich-item-renderer .ytBadgeShapeThumbnailBadge", "backgroundColor"],
+  "video.length.text": ["ytd-rich-item-renderer .ytBadgeShapeThumbnailBadge .ytBadgeShapeText", "color"]
+};
 const SIDEBAR_KEY_ATTR = "data-ytc-sidebar-key";
 const SIDEBAR_DISABLED_CLASS = "ytc-sidebar-disabled";
 const SIDEBAR_TREE_STORAGE_KEY = "sidebarTree";
@@ -52,6 +95,7 @@ const GUIDE_FETCH_BACKOFF = 60 * 1000;
 
 let currentVideosPerRow = DEFAULT_VIDEOS_PER_ROW;
 let currentUiRadius = DEFAULT_UI_RADIUS;
+let currentHomeColors = {};
 let currentHoverHighlights = true;
 let removeRecommendedEnabled = false;
 let currentFontFamily = "";
@@ -155,6 +199,110 @@ function applyUiRadius(value) {
   }
 }
 
+function normalizeHomeColor(value) {
+  return typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value) ? value.toLowerCase() : "";
+}
+
+function parseComputedColor(value) {
+  const match = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([0-9.]+))?\s*\)$/.exec(value || "");
+  if (!match) return null;
+  return {
+    r: Number(match[1]),
+    g: Number(match[2]),
+    b: Number(match[3]),
+    a: match[4] === undefined ? 1 : Number(match[4])
+  };
+}
+
+function rgbToHex({ r, g, b }) {
+  return `#${[r, g, b]
+    .map((value) => Math.max(0, Math.min(255, Math.round(value))).toString(16).padStart(2, "0"))
+    .join("")}`;
+}
+
+function hexToRgb(hex) {
+  return {
+    r: parseInt(hex.slice(1, 3), 16),
+    g: parseInt(hex.slice(3, 5), 16),
+    b: parseInt(hex.slice(5, 7), 16)
+  };
+}
+
+function opaqueBackgroundHex(element) {
+  let node = element;
+  while (node && node.nodeType === 1) {
+    const color = parseComputedColor(getComputedStyle(node).backgroundColor);
+    if (color && color.a >= 1) return rgbToHex(color);
+    node = node.parentElement || (node.parentNode && node.parentNode.host) || null;
+  }
+  return "";
+}
+
+// YouTube uses translucent fills (for example rgba(0, 0, 0, 0.05) on the
+// microphone button). Flatten them onto the nearest opaque ancestor so each
+// swatch starts at the color the element actually displays.
+function sampledColorHex(element, property) {
+  const color = parseComputedColor(getComputedStyle(element)[property]);
+  if (!color) return "";
+  if (color.a >= 1) return rgbToHex(color);
+  const backdrop = opaqueBackgroundHex(color.a <= 0 ? element : element.parentElement) || "#ffffff";
+  if (color.a <= 0) return backdrop;
+  const base = hexToRgb(backdrop);
+  return rgbToHex({
+    r: color.r * color.a + base.r * (1 - color.a),
+    g: color.g * color.a + base.g * (1 - color.a),
+    b: color.b * color.a + base.b * (1 - color.a)
+  });
+}
+
+function applyHomeColors(colors) {
+  const map = colors && typeof colors === "object" ? colors : {};
+  currentHomeColors = map;
+  const root = document.documentElement;
+  let css = "";
+
+  for (const [key, value] of Object.entries(map)) {
+    const color = normalizeHomeColor(value);
+    const rules = HOME_COLOR_RULES[key];
+    if (!color || !rules) continue;
+    for (const [selector, declaration] of rules) {
+      css += `html[data-ytc-home-colors] ${selector}{${declaration}:${color} !important}\n`;
+    }
+  }
+
+  let style = document.getElementById(HOME_COLOR_STYLE_ID);
+  if (!css || !isHomeFeed()) {
+    style?.remove();
+    delete root.dataset.ytcHomeColors;
+    return;
+  }
+  if (!style) {
+    style = document.createElement("style");
+    style.id = HOME_COLOR_STYLE_ID;
+    (document.head || root).append(style);
+  }
+  if (style.textContent !== css) style.textContent = css;
+  root.dataset.ytcHomeColors = "1";
+}
+
+function sampleHomeColors() {
+  const style = document.getElementById(HOME_COLOR_STYLE_ID);
+  const sheet = style && style.sheet;
+  const wasDisabled = Boolean(sheet && sheet.disabled);
+  if (sheet) sheet.disabled = true;
+
+  const colors = {};
+  for (const [key, [selector, property]] of Object.entries(HOME_COLOR_SAMPLE_RULES)) {
+    const element = document.querySelector(selector);
+    if (!element) continue;
+    const hex = sampledColorHex(element, property);
+    if (hex) colors[key] = hex;
+  }
+
+  if (sheet) sheet.disabled = wasDisabled;
+  return colors;
+}
+
 const SEARCH_INPUT_SELECTOR = [
   "input.ytSearchboxComponentInput",
   "yt-searchbox input[type='text']",
@@ -183,6 +331,38 @@ function restoreSearchPlaceholder() {
   }
 }
 
+function askButtonTarget(node) {
+  if (!node) return null;
+  const ariaLabel = (node.getAttribute("aria-label") || "").replace(/\s+/g, " ").trim();
+  const text = (node.innerText || "").replace(/\s+/g, " ").trim();
+  const className = typeof node.className === "string" ? node.className : "";
+  const matchesLabel = [ariaLabel, text].some((value) =>
+    Boolean(value) && (
+      /^ask(?:\s+youtube)?$/i.test(value) ||
+      /\bask\s+youtube\b/i.test(value) ||
+      /\bask about (?:this|the) video\b/i.test(value)
+    )
+  );
+  const matchesClass = /ask-?youtube/i.test(`${node.id} ${className}`);
+  if (!matchesLabel && !matchesClass) return null;
+
+  return node.closest("button-view-model") ||
+    node.closest("button, ytd-button-renderer, tp-yt-paper-button, a[role='button'], [role='button']") ||
+    node;
+}
+
+// Tag the masthead Ask entry point so the Home color rules can target it even
+// though YouTube exposes it through text/aria labels rather than a stable id.
+function markAskButtons() {
+  if (!isHomeFeed()) return;
+  const masthead = document.querySelector("ytd-masthead");
+  if (!masthead) return;
+  for (const node of masthead.querySelectorAll(NO_AI_CANDIDATE_SELECTOR)) {
+    const target = askButtonTarget(node);
+    if (target) target.classList.add(ASK_BUTTON_CLASS);
+  }
+}
+
 function applyNoAI(value) {
   noAISetting = Boolean(value);
   const marked = document.querySelectorAll(`.${NO_AI_CLASS}`);
@@ -205,23 +385,8 @@ function applyNoAI(value) {
   const scopes = isHomeFeed() ? [document] : Array.from(document.querySelectorAll("ytd-watch-metadata"));
   for (const scope of scopes) {
     for (const node of scope.querySelectorAll(NO_AI_CANDIDATE_SELECTOR)) {
-      const ariaLabel = (node.getAttribute("aria-label") || "").replace(/\s+/g, " ").trim();
-      const text = (node.innerText || "").replace(/\s+/g, " ").trim();
-      const className = typeof node.className === "string" ? node.className : "";
-      const matchesLabel = [ariaLabel, text].some((value) =>
-        Boolean(value) && (
-          /^ask(?:\s+youtube)?$/i.test(value) ||
-          /\bask\s+youtube\b/i.test(value) ||
-          /\bask about (?:this|the) video\b/i.test(value)
-        )
-      );
-      const matchesClass = /ask-?youtube/i.test(`${node.id} ${className}`);
-      if (!matchesLabel && !matchesClass) continue;
-
-      const target = node.closest("button-view-model") ||
-        node.closest("button, ytd-button-renderer, tp-yt-paper-button, a[role='button'], [role='button']") ||
-        node;
-      target.classList.add(NO_AI_CLASS);
+      const target = askButtonTarget(node);
+      if (target) target.classList.add(NO_AI_CLASS);
     }
   }
 }
@@ -1054,6 +1219,8 @@ function scheduleItemSync() {
     skipBrokenIntro();
     purgeShorts();
     applyNoAI(noAISetting);
+    markAskButtons();
+    applyHomeColors(currentHomeColors);
     markNoRadiusElements();
     syncSidebar();
     syncDislikes();
@@ -1098,6 +1265,8 @@ for (const eventName of ["yt-navigate-finish", "yt-page-data-updated", "popstate
     applyHoverHighlights(currentHoverHighlights);
     applyFontFamily(currentFontFamily);
     applyNoAI(noAISetting);
+    markAskButtons();
+    applyHomeColors(currentHomeColors);
     syncSidebar();
     syncDislikes();
     applyRemoveHashtags(removeHashtagsEnabled);
@@ -1119,6 +1288,7 @@ function applySyncSettings(settings) {
   applyUiRadius(settings.uiRadius);
   applyHoverHighlights(settings.hoverHighlights);
   applyFontFamily(settings.fontFamily);
+  applyHomeColors(settings.homeColors);
   applyNoAI(settings.noAI);
   applyAddDislikes(settings.addDislikes !== false);
   applyRemoveHashtags(settings.removeHashtags);
@@ -1126,7 +1296,7 @@ function applySyncSettings(settings) {
 }
 
 function loadSyncSettings() {
-  globalThis.chrome?.storage?.sync?.get({ videosPerRow: DEFAULT_VIDEOS_PER_ROW, uiRadius: DEFAULT_UI_RADIUS, noAI: false, hoverHighlights: true, addDislikes: true, fontFamily: "", removeHashtags: false, removeRecommended: false }, applySyncSettings);
+  globalThis.chrome?.storage?.sync?.get({ videosPerRow: DEFAULT_VIDEOS_PER_ROW, uiRadius: DEFAULT_UI_RADIUS, noAI: false, hoverHighlights: true, addDislikes: true, fontFamily: "", removeHashtags: false, removeRecommended: false, homeColors: {} }, applySyncSettings);
 }
 
 loadLocalSettings();
@@ -1149,6 +1319,10 @@ window.addEventListener("pageshow", reloadSettings);
 if (!globalThis.__ytcMessageListener) {
   globalThis.__ytcMessageListener = true;
   globalThis.chrome?.runtime?.onMessage?.addListener((message, sender, sendResponse) => {
+    if (message?.type === "ytc-sample-home-colors") {
+      sendResponse({ colors: sampleHomeColors() });
+      return false;
+    }
     if (message?.type === "ytc-apply-sidebar") {
       const keys = Array.isArray(message.keys) ? message.keys.filter((key) => typeof key === "string") : [];
       sidebarDisabledKeys = new Set(keys);
@@ -1176,6 +1350,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (changes.uiRadius) applyUiRadius(changes.uiRadius.newValue);
   if (changes.hoverHighlights) applyHoverHighlights(changes.hoverHighlights.newValue);
   if (changes.fontFamily) applyFontFamily(changes.fontFamily.newValue);
+  if (changes.homeColors) applyHomeColors(changes.homeColors.newValue);
   if (changes.noAI) applyNoAI(changes.noAI.newValue);
   if (changes.removeHashtags) applyRemoveHashtags(changes.removeHashtags.newValue);
   if (changes.removeRecommended) applyRemoveRecommended(changes.removeRecommended.newValue);

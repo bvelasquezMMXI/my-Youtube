@@ -32,13 +32,21 @@ hashtags** strips hashtags from video titles and descriptions on watch pages,
 cards, and Shorts, and hides hashtag links; turning it off restores the
 original text. **Remove recommended videos** hides the watch page's right
 column and expands the player, description, and comments to the full width.
+Under **Themes → Home**, a nested list of color fields covers the home page's
+search bar (surface and text), search button (surface and decal), Ask YouTube
+button (surface and text, hidden while that element is removed), microphone
+(surface and decal), filter bar (bar, options, and option text), and video
+cards (card, title, stats/channel line, length badge, and badge text). Each
+swatch starts at the color YouTube currently uses, updates the page while it is
+edited, and the ↺ button restores the native color. Picks persist in
+`chrome.storage.sync` as `homeColors`.
 
 ## Structure
 
 ```
 manifest.json   Extension metadata, permissions, content scripts
 background.js   Fetches and caches dislike counts
-content.js      Applies layout, radius, font, and dislike changes
+content.js      Applies layout, radius, color, font, and dislike changes
 content.css     Grid, intro, radius, and dislike-count styling
 popup.html      Popup markup
 popup.css       Popup styling

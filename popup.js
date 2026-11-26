@@ -25,6 +25,181 @@ const removeHashtagsOption = document.getElementById("remove-hashtags");
 const removeHashtagsCheckbox = document.getElementById("remove-hashtags-checkbox");
 const noRecommendedOption = document.getElementById("no-recommended");
 const noRecommendedCheckbox = document.getElementById("no-recommended-checkbox");
+const themeHomeColors = document.getElementById("theme-home-colors");
+
+const homeColorSpec = [
+  {
+    key: "searchBar",
+    label: "Search bar",
+    fallback: "#ffffff",
+    children: [{ key: "searchBar.text", label: "Text color", fallback: "#0f0f0f" }]
+  },
+  {
+    key: "searchButton",
+    label: "Search button",
+    fallback: "#f8f8f8",
+    children: [{ key: "searchButton.decal", label: "Decal color", fallback: "#0f0f0f" }]
+  },
+  {
+    key: "askButton",
+    label: "Ask YouTube button",
+    fallback: "#ffffff",
+    requiresAsk: true,
+    children: [{ key: "askButton.text", label: "Text color", fallback: "#0f0f0f" }]
+  },
+  {
+    key: "micButton",
+    label: "Microphone button",
+    fallback: "#f2f2f2",
+    children: [{ key: "micButton.decal", label: "Microphone decal color", fallback: "#0f0f0f" }]
+  },
+  {
+    key: "filterBar",
+    label: "Filter bar",
+    fallback: "#ffffff",
+    children: [
+      {
+        key: "filterBar.options",
+        label: "Options",
+        fallback: "#f2f2f2",
+        children: [{ key: "filterBar.options.text", label: "Text color", fallback: "#0f0f0f" }]
+      }
+    ]
+  },
+  {
+    key: "video",
+    label: "Video",
+    fallback: "#ffffff",
+    children: [
+      { key: "video.title", label: "Title color", fallback: "#0f0f0f" },
+      { key: "video.meta", label: "Stats/channel name text color", fallback: "#606060" },
+      {
+        key: "video.length",
+        label: "Length badge color",
+        fallback: "#000000",
+        children: [{ key: "video.length.text", label: "Text color", fallback: "#ffffff" }]
+      }
+    ]
+  }
+];
+
+const homeColorState = Object.create(null);
+let homeColorSamples = Object.create(null);
+let homeColorSamplesRequested = false;
+
+function normalizeHexColor(value) {
+  const text = typeof value === "string" ? value.trim() : "";
+  return /^#[0-9a-f]{6}$/i.test(text) ? text.toLowerCase() : "";
+}
+
+function homeColorValue(node) {
+  return normalizeHexColor(homeColorState[node.key]) ||
+    normalizeHexColor(homeColorSamples[node.key]) ||
+    node.fallback;
+}
+
+function saveHomeColors() {
+  const colors = {};
+  for (const [key, value] of Object.entries(homeColorState)) {
+    const hex = normalizeHexColor(value);
+    if (hex) colors[key] = hex;
+  }
+  saveSync({ homeColors: colors });
+}
+
+function renderHomeColors() {
+  themeHomeColors.replaceChildren();
+  const addRow = (node, depth) => {
+    if (node.requiresAsk && noAICheckbox.checked) return;
+
+    const row = document.createElement("div");
+    row.className = "color-row";
+    if (depth) row.style.paddingLeft = `${depth * 12}px`;
+
+    const label = document.createElement("span");
+    label.className = "color-label";
+    label.textContent = node.label;
+
+    const swatch = document.createElement("input");
+    swatch.type = "color";
+    swatch.className = "color-swatch";
+    swatch.value = homeColorValue(node);
+    swatch.title = `${node.label} color`;
+    swatch.setAttribute("aria-label", `${node.label} color`);
+
+    const reset = document.createElement("button");
+    reset.type = "button";
+    reset.className = "color-reset";
+    reset.textContent = "\u21ba";
+    reset.title = `Restore YouTube's ${node.label} color`;
+    reset.setAttribute("aria-label", `Restore YouTube's ${node.label} color`);
+    reset.hidden = !normalizeHexColor(homeColorState[node.key]);
+
+    let saveTimer = 0;
+    const applySwatch = () => {
+      const hex = normalizeHexColor(swatch.value);
+      if (!hex) return;
+      homeColorState[node.key] = hex;
+      reset.hidden = false;
+    };
+
+    swatch.addEventListener("input", () => {
+      applySwatch();
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(saveHomeColors, 700);
+    });
+
+    swatch.addEventListener("change", () => {
+      clearTimeout(saveTimer);
+      applySwatch();
+      saveHomeColors();
+    });
+
+    reset.addEventListener("click", () => {
+      clearTimeout(saveTimer);
+      delete homeColorState[node.key];
+      swatch.value = normalizeHexColor(homeColorSamples[node.key]) || node.fallback;
+      reset.hidden = true;
+      saveHomeColors();
+    });
+
+    row.append(label, swatch, reset);
+    themeHomeColors.append(row);
+    for (const child of node.children || []) addRow(child, depth + 1);
+  };
+
+  for (const node of homeColorSpec) addRow(node, 0);
+}
+
+function requestHomeColorSamples() {
+  if (homeColorSamplesRequested) return;
+  const tabs = globalThis.chrome?.tabs;
+  if (!tabs?.query || !tabs?.sendMessage) return;
+
+  tabs.query({}, (result) => {
+    const candidates = (result || []).filter((tab) =>
+      tab && typeof tab.id === "number" && !tab.discarded && typeof tab.url === "string" && /youtube\.com\//i.test(tab.url)
+    );
+    const isHome = (tab) => {
+      try {
+        return new URL(tab.url).pathname === "/";
+      } catch (error) {
+        return false;
+      }
+    };
+    const tab = candidates.find(isHome) || candidates[0];
+    if (!tab) return;
+
+    tabs.sendMessage(tab.id, { type: "ytc-sample-home-colors" }, (response) => {
+      void globalThis.chrome?.runtime?.lastError;
+      const colors = response && response.colors;
+      if (!colors || typeof colors !== "object") return;
+      homeColorSamples = colors;
+      homeColorSamplesRequested = true;
+      renderHomeColors();
+    });
+  });
+}
 
 const syncStorage = globalThis.chrome?.storage?.sync;
 const localStore = globalThis.chrome?.storage?.local;
@@ -226,6 +401,13 @@ function applySettings(settings) {
   noRecommendedCheckbox.checked = Boolean(settings.removeRecommended);
   fontSelect.value = settings.fontFamily || "";
   if (fontSelect.selectedIndex === -1) fontSelect.value = "";
+
+  for (const key of Object.keys(homeColorState)) delete homeColorState[key];
+  for (const [key, value] of Object.entries(settings.homeColors || {})) {
+    const hex = normalizeHexColor(value);
+    if (hex) homeColorState[key] = hex;
+  }
+  renderHomeColors();
 }
 
 const settingsDefaults = {
@@ -236,7 +418,8 @@ const settingsDefaults = {
   addDislikes: true,
   removeHashtags: false,
   removeRecommended: false,
-  fontFamily: ""
+  fontFamily: "",
+  homeColors: {}
 };
 
 renderSidebarTree();
@@ -332,6 +515,7 @@ fontFile.addEventListener("change", () => {
 
 noAICheckbox.addEventListener("change", () => {
   saveSync({ noAI: noAICheckbox.checked });
+  renderHomeColors();
 });
 
 hoverCheckbox.addEventListener("change", () => {
@@ -407,9 +591,11 @@ function selectSubtab(tab) {
 
   const onHome = tab.dataset.category === "tab-home";
   const onPlayer = tab.dataset.category === "tab-player";
+  const onThemes = tab.dataset.category === "tab-themes";
   const hasMainOptions = onHome && tab.dataset.label === "Main";
   const hasSidebarOptions = onHome && tab.dataset.label === "Sidebar";
   const hasPlayerMainOptions = onPlayer && tab.dataset.label === "Main";
+  const hasThemeHomeColors = onThemes && tab.dataset.label === "Home";
   videosPerRow.hidden = !hasMainOptions;
   cornerOption.hidden = !hasMainOptions;
   noAIOption.hidden = !hasMainOptions;
@@ -419,8 +605,13 @@ function selectSubtab(tab) {
   addDislikesOption.hidden = !hasPlayerMainOptions;
   removeHashtagsOption.hidden = !hasPlayerMainOptions;
   noRecommendedOption.hidden = !hasPlayerMainOptions;
-  panelEmpty.hidden = hasMainOptions || hasSidebarOptions || hasPlayerMainOptions;
+  themeHomeColors.hidden = !hasThemeHomeColors;
+  panelEmpty.hidden = hasMainOptions || hasSidebarOptions || hasPlayerMainOptions || hasThemeHomeColors;
   if (hasSidebarOptions) renderSidebarTree();
+  if (hasThemeHomeColors) {
+    renderHomeColors();
+    requestHomeColorSamples();
+  }
 }
 
 function renderSubtabs(category) {
