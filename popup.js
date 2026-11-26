@@ -26,6 +26,12 @@ const removeHashtagsCheckbox = document.getElementById("remove-hashtags-checkbox
 const noRecommendedOption = document.getElementById("no-recommended");
 const noRecommendedCheckbox = document.getElementById("no-recommended-checkbox");
 const themeHomeColors = document.getElementById("theme-home-colors");
+const themeHomeTree = document.getElementById("theme-home-tree");
+const themeHomeReset = document.getElementById("theme-home-reset");
+const themeBgImageButton = document.getElementById("theme-bg-image-button");
+const themeBgImageRemove = document.getElementById("theme-bg-image-remove");
+const themeBgImageFile = document.getElementById("theme-bg-image-file");
+const themeBgImagePreview = document.getElementById("theme-bg-image-preview");
 
 const homeColorSpec = [
   {
@@ -80,16 +86,24 @@ const homeColorSpec = [
         children: [{ key: "video.length.text", label: "Text color", fallback: "#ffffff" }]
       }
     ]
-  }
+  },
+  { key: "pageBackground", label: "Page background", fallback: "#ffffff" },
+  { key: "sidebar", label: "Sidebar", fallback: "#ffffff" }
 ];
 
 const homeColorState = Object.create(null);
 let homeColorSamples = Object.create(null);
 let homeColorSamplesRequested = false;
+let homeBackgroundImage = "";
 
 function normalizeHexColor(value) {
   const text = typeof value === "string" ? value.trim() : "";
   return /^#[0-9a-f]{6}$/i.test(text) ? text.toLowerCase() : "";
+}
+
+function parseHexInput(value) {
+  const text = typeof value === "string" ? value.trim().replace(/^#/, "") : "";
+  return /^[0-9a-f]{6}$/i.test(text) ? `#${text.toLowerCase()}` : "";
 }
 
 function homeColorValue(node) {
@@ -108,24 +122,41 @@ function saveHomeColors() {
 }
 
 function renderHomeColors() {
-  themeHomeColors.replaceChildren();
-  const addRow = (node, depth) => {
+  themeHomeTree.replaceChildren();
+  themeHomeReset.disabled = Object.keys(homeColorState).length === 0;
+  const addRow = (node, depth, isLast) => {
     if (node.requiresAsk && noAICheckbox.checked) return;
 
     const row = document.createElement("div");
     row.className = "color-row";
-    if (depth) row.style.paddingLeft = `${depth * 12}px`;
+    if (depth) {
+      row.classList.add("color-row-child");
+      if (isLast) row.classList.add("color-row-last");
+      row.style.paddingLeft = `${depth * 12}px`;
+      row.style.setProperty("--ytc-color-line-left", `${(depth - 1) * 12 + 4}px`);
+    }
 
     const label = document.createElement("span");
     label.className = "color-label";
     label.textContent = node.label;
 
+    const initialColor = homeColorValue(node);
     const swatch = document.createElement("input");
     swatch.type = "color";
     swatch.className = "color-swatch";
-    swatch.value = homeColorValue(node);
+    swatch.value = initialColor;
     swatch.title = `${node.label} color`;
-    swatch.setAttribute("aria-label", `${node.label} color`);
+    swatch.setAttribute("aria-label", `${node.label} color picker`);
+
+    const hexInput = document.createElement("input");
+    hexInput.type = "text";
+    hexInput.className = "color-hex";
+    hexInput.value = initialColor.toUpperCase();
+    hexInput.maxLength = 7;
+    hexInput.spellcheck = false;
+    hexInput.autocomplete = "off";
+    hexInput.title = `${node.label} hex color`;
+    hexInput.setAttribute("aria-label", `${node.label} hex color`);
 
     const reset = document.createElement("button");
     reset.type = "button";
@@ -136,40 +167,115 @@ function renderHomeColors() {
     reset.hidden = !normalizeHexColor(homeColorState[node.key]);
 
     let saveTimer = 0;
-    const applySwatch = () => {
-      const hex = normalizeHexColor(swatch.value);
-      if (!hex) return;
-      homeColorState[node.key] = hex;
+    const queueSave = () => {
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(saveHomeColors, 700);
+    };
+    const commitColor = (color) => {
+      const normalized = normalizeHexColor(color);
+      if (!normalized) return "";
+      homeColorState[node.key] = normalized;
       reset.hidden = false;
+      return normalized;
     };
 
     swatch.addEventListener("input", () => {
-      applySwatch();
-      clearTimeout(saveTimer);
-      saveTimer = setTimeout(saveHomeColors, 700);
+      const normalized = commitColor(swatch.value);
+      if (normalized) hexInput.value = normalized.toUpperCase();
+      queueSave();
     });
 
     swatch.addEventListener("change", () => {
       clearTimeout(saveTimer);
-      applySwatch();
+      const normalized = commitColor(swatch.value);
+      if (normalized) hexInput.value = normalized.toUpperCase();
+      saveHomeColors();
+    });
+
+    hexInput.addEventListener("input", () => {
+      const normalized = commitColor(parseHexInput(hexInput.value));
+      if (!normalized) return;
+      swatch.value = normalized;
+      queueSave();
+    });
+
+    hexInput.addEventListener("change", () => {
+      clearTimeout(saveTimer);
+      const normalized = commitColor(parseHexInput(hexInput.value));
+      if (!normalized) {
+        hexInput.value = swatch.value.toUpperCase();
+        return;
+      }
+      hexInput.value = normalized.toUpperCase();
+      swatch.value = normalized;
       saveHomeColors();
     });
 
     reset.addEventListener("click", () => {
       clearTimeout(saveTimer);
       delete homeColorState[node.key];
-      swatch.value = normalizeHexColor(homeColorSamples[node.key]) || node.fallback;
+      const restored = normalizeHexColor(homeColorSamples[node.key]) || node.fallback;
+      swatch.value = restored;
+      hexInput.value = restored.toUpperCase();
       reset.hidden = true;
       saveHomeColors();
     });
 
-    row.append(label, swatch, reset);
-    themeHomeColors.append(row);
-    for (const child of node.children || []) addRow(child, depth + 1);
+    row.append(label, swatch, hexInput, reset);
+    themeHomeTree.append(row);
+
+    const children = (node.children || []).filter((child) =>
+      !(child.requiresAsk && noAICheckbox.checked)
+    );
+    children.forEach((child, index) => addRow(child, depth + 1, index === children.length - 1));
   };
 
-  for (const node of homeColorSpec) addRow(node, 0);
+  for (const node of homeColorSpec) addRow(node, 0, false);
 }
+
+themeHomeReset.addEventListener("click", () => {
+  if (!Object.keys(homeColorState).length) return;
+  for (const key of Object.keys(homeColorState)) delete homeColorState[key];
+  renderHomeColors();
+  saveHomeColors();
+});
+
+function renderHomeBackgroundImage() {
+  const set = typeof homeBackgroundImage === "string" && homeBackgroundImage.startsWith("data:image/");
+  themeBgImageButton.textContent = set ? "Change image" : "Choose image";
+  themeBgImageRemove.hidden = !set;
+  themeBgImagePreview.hidden = !set;
+  themeBgImagePreview.style.backgroundImage = set ? `url("${homeBackgroundImage}")` : "";
+}
+
+themeBgImageButton.addEventListener("click", () => themeBgImageFile.click());
+
+themeBgImageFile.addEventListener("change", () => {
+  const file = themeBgImageFile.files && themeBgImageFile.files[0];
+  themeBgImageFile.value = "";
+  if (!file || !/^image\//i.test(file.type)) return;
+
+  const reader = new FileReader();
+  reader.onerror = () => {
+    themeBgImageButton.textContent = "Read error";
+  };
+  reader.onload = () => {
+    const dataUrl = typeof reader.result === "string" ? reader.result : "";
+    if (!dataUrl.startsWith("data:image/")) return;
+    homeBackgroundImage = dataUrl;
+    renderHomeBackgroundImage();
+    localStore?.set({ homeBackgroundImage: dataUrl });
+  };
+  reader.readAsDataURL(file);
+});
+
+themeBgImageRemove.addEventListener("click", () => {
+  homeBackgroundImage = "";
+  renderHomeBackgroundImage();
+  localStore?.set({ homeBackgroundImage: "" });
+});
+
+renderHomeBackgroundImage();
 
 function requestHomeColorSamples() {
   if (homeColorSamplesRequested) return;
@@ -425,11 +531,13 @@ const settingsDefaults = {
 renderSidebarTree();
 
 if (localStore?.get) {
-  localStore.get({ customFonts: [], sidebarTree: [], sidebarDisabled: [] }, (local) => {
+  localStore.get({ customFonts: [], sidebarTree: [], sidebarDisabled: [], homeBackgroundImage: "" }, (local) => {
     appendCustomFonts(local.customFonts);
     sidebarItems = Array.isArray(local.sidebarTree) ? local.sidebarTree : [];
     sidebarDisabled = new Set(Array.isArray(local.sidebarDisabled) ? local.sidebarDisabled.filter((key) => typeof key === "string") : []);
+    homeBackgroundImage = typeof local.homeBackgroundImage === "string" ? local.homeBackgroundImage : "";
     renderSidebarTree();
+    renderHomeBackgroundImage();
   });
 }
 

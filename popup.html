@@ -60,7 +60,19 @@
         <div class="sidebar-tree" id="sidebar-tree"></div>
         <p class="empty" id="sidebar-empty" hidden></p>
       </div>
-      <div class="color-tree" id="theme-home-colors" hidden></div>
+      <div id="theme-home-colors" hidden>
+        <div class="color-tree" id="theme-home-tree"></div>
+        <div class="color-image">
+          <span class="color-label">Background image</span>
+          <span class="color-image-preview" id="theme-bg-image-preview" hidden></span>
+          <button class="option-upload" id="theme-bg-image-button" type="button">Choose image</button>
+          <button class="color-reset-all" id="theme-bg-image-remove" type="button" hidden>Remove</button>
+          <input id="theme-bg-image-file" type="file" accept="image/*" hidden>
+        </div>
+        <div class="color-toolbar">
+          <button class="color-reset-all" id="theme-home-reset" type="button">Reset all colors</button>
+        </div>
+      </div>
       <div class="option option-toggle" id="add-dislikes" hidden>
         <label class="option-label" for="add-dislikes-checkbox">
           <input class="option-check" id="add-dislikes-checkbox" type="checkbox" checked>

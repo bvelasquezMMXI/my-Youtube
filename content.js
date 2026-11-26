@@ -45,6 +45,7 @@ const NO_RADIUS_SELECTOR = [
   ".ytd-thumbnail-overlay-resume-playback-renderer"
 ].join(", ");
 const HOME_COLOR_STYLE_ID = "ytc-home-colors";
+const HOME_IMAGE_STYLE_ID = "ytc-home-bg-image";
 const ASK_BUTTON_CLASS = "ytc-ask-button";
 const ASK_BUTTON_SELECTOR = ".ytc-ask-button, .ytc-ask-button button";
 const CHIP_OPTION_SCOPE = "ytd-feed-filter-chip-bar-renderer yt-chip-cloud-chip-renderer:not([selected]):not(.iron-selected)";
@@ -67,7 +68,11 @@ const HOME_COLOR_RULES = {
   "video.title": [["ytd-rich-item-renderer .ytLockupMetadataViewModelTitle, ytd-rich-item-renderer #video-title", "color"]],
   "video.meta": [["ytd-rich-item-renderer .ytContentMetadataViewModelMetadataText, ytd-rich-item-renderer #metadata-line", "color"]],
   "video.length": [["ytd-rich-item-renderer .ytBadgeShapeThumbnailBadge", "background-color"]],
-  "video.length.text": [["ytd-rich-item-renderer .ytBadgeShapeThumbnailBadge .ytBadgeShapeText", "color"]]
+  "video.length.text": [["ytd-rich-item-renderer .ytBadgeShapeThumbnailBadge .ytBadgeShapeText", "color"]],
+  pageBackground: [["ytd-app", "background-color"], ["body", "background-color"]],
+  sidebar: [
+    ["ytd-guide-renderer, ytd-mini-guide-renderer, #guide-content, #guide-inner-content", "background-color"]
+  ]
 };
 const HOME_COLOR_SAMPLE_RULES = {
   searchBar: ["yt-searchbox .ytSearchboxComponentInputBox", "backgroundColor"],
@@ -85,7 +90,9 @@ const HOME_COLOR_SAMPLE_RULES = {
   "video.title": ["ytd-rich-item-renderer .ytLockupMetadataViewModelTitle, ytd-rich-item-renderer #video-title", "color"],
   "video.meta": ["ytd-rich-item-renderer .ytContentMetadataViewModelMetadataText, ytd-rich-item-renderer #metadata-line", "color"],
   "video.length": ["ytd-rich-item-renderer .ytBadgeShapeThumbnailBadge", "backgroundColor"],
-  "video.length.text": ["ytd-rich-item-renderer .ytBadgeShapeThumbnailBadge .ytBadgeShapeText", "color"]
+  "video.length.text": ["ytd-rich-item-renderer .ytBadgeShapeThumbnailBadge .ytBadgeShapeText", "color"],
+  pageBackground: ["ytd-app", "backgroundColor"],
+  sidebar: ["ytd-guide-renderer, #guide-content, #guide-inner-content", "backgroundColor"]
 };
 const SIDEBAR_KEY_ATTR = "data-ytc-sidebar-key";
 const SIDEBAR_DISABLED_CLASS = "ytc-sidebar-disabled";
@@ -96,6 +103,7 @@ const GUIDE_FETCH_BACKOFF = 60 * 1000;
 let currentVideosPerRow = DEFAULT_VIDEOS_PER_ROW;
 let currentUiRadius = DEFAULT_UI_RADIUS;
 let currentHomeColors = {};
+let currentHomeBackgroundImage = "";
 let currentHoverHighlights = true;
 let removeRecommendedEnabled = false;
 let currentFontFamily = "";
@@ -283,6 +291,30 @@ function applyHomeColors(colors) {
   }
   if (style.textContent !== css) style.textContent = css;
   root.dataset.ytcHomeColors = "1";
+}
+
+function applyHomeBackgroundImage(value) {
+  currentHomeBackgroundImage = typeof value === "string" ? value : "";
+  const root = document.documentElement;
+  let style = document.getElementById(HOME_IMAGE_STYLE_ID);
+
+  if (!currentHomeBackgroundImage.startsWith("data:image/") || !isHomeFeed()) {
+    style?.remove();
+    delete root.dataset.ytcHomeBg;
+    return;
+  }
+
+  if (!style) {
+    style = document.createElement("style");
+    style.id = HOME_IMAGE_STYLE_ID;
+    (document.head || root).append(style);
+  }
+  const css = `html[data-ytc-home-bg] ytd-app{` +
+    `background-image:url("${currentHomeBackgroundImage}") !important;` +
+    "background-size:cover !important;background-position:center !important;" +
+    "background-attachment:fixed !important;background-repeat:no-repeat !important}\n";
+  if (style.textContent !== css) style.textContent = css;
+  root.dataset.ytcHomeBg = "1";
 }
 
 function sampleHomeColors() {
@@ -1221,6 +1253,7 @@ function scheduleItemSync() {
     applyNoAI(noAISetting);
     markAskButtons();
     applyHomeColors(currentHomeColors);
+    applyHomeBackgroundImage(currentHomeBackgroundImage);
     markNoRadiusElements();
     syncSidebar();
     syncDislikes();
@@ -1267,6 +1300,7 @@ for (const eventName of ["yt-navigate-finish", "yt-page-data-updated", "popstate
     applyNoAI(noAISetting);
     markAskButtons();
     applyHomeColors(currentHomeColors);
+    applyHomeBackgroundImage(currentHomeBackgroundImage);
     syncSidebar();
     syncDislikes();
     applyRemoveHashtags(removeHashtagsEnabled);
@@ -1276,9 +1310,10 @@ for (const eventName of ["yt-navigate-finish", "yt-page-data-updated", "popstate
 
 
 function loadLocalSettings() {
-  globalThis.chrome?.storage?.local?.get({ customFonts: [], sidebarDisabled: [] }, (data) => {
+  globalThis.chrome?.storage?.local?.get({ customFonts: [], sidebarDisabled: [], homeBackgroundImage: "" }, (data) => {
     injectCustomFonts(data.customFonts);
     sidebarDisabledKeys = new Set(Array.isArray(data.sidebarDisabled) ? data.sidebarDisabled.filter((key) => typeof key === "string") : []);
+    applyHomeBackgroundImage(data.homeBackgroundImage);
     syncSidebar();
   });
 }
@@ -1343,6 +1378,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
       sidebarDisabledKeys = new Set(Array.isArray(changes.sidebarDisabled.newValue) ? changes.sidebarDisabled.newValue.filter((key) => typeof key === "string") : []);
       applySidebarDisabled();
     }
+    if (changes.homeBackgroundImage) applyHomeBackgroundImage(changes.homeBackgroundImage.newValue);
     return;
   }
   if (area !== "sync") return;

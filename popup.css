@@ -336,21 +336,122 @@ main {
 .color-tree {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 0;
 }
 
-.color-tree[hidden] {
+.color-tree[hidden],
+#theme-home-colors[hidden] {
   display: none;
 }
 
+.color-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
+}
+
+.color-image {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.color-image-preview {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 16px;
+  border: 1px solid var(--border);
+  background-position: center;
+  background-size: cover;
+}
+
+.color-image-preview[hidden] {
+  display: none;
+}
+
+.color-hex {
+  flex: 0 0 auto;
+  width: 62px;
+  padding: 1px 2px;
+  border: 1px solid var(--border);
+  border-radius: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 10px/1.2 "Courier New", monospace;
+  text-transform: uppercase;
+}
+
+.color-hex:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.color-reset-all {
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: 0;
+  background: var(--surface);
+  color: var(--fg);
+  font: 10px/1.2 Arial, Helvetica, sans-serif;
+  cursor: pointer;
+}
+
+.color-reset-all:hover {
+  background: var(--hover);
+}
+
+.color-reset-all:disabled {
+  opacity: 0.5;
+  background: var(--surface);
+  cursor: default;
+}
+
+.color-reset-all:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
 .color-row {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
+  padding-block: 2px;
   font-size: 10px;
   font-weight: 700;
   line-height: 1.3;
+}
+
+.color-row-child::before,
+.color-row-child::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  border-color: var(--fg);
+  opacity: 0.35;
+}
+
+.color-row-child::before {
+  top: 0;
+  bottom: 0;
+  left: var(--ytc-color-line-left, 4px);
+  border-left: 1px solid;
+}
+
+.color-row-child::after {
+  top: 50%;
+  left: var(--ytc-color-line-left, 4px);
+  width: 8px;
+  border-top: 1px solid;
+}
+
+.color-row-last::before {
+  bottom: auto;
+  height: 50%;
 }
 
 .color-label {
