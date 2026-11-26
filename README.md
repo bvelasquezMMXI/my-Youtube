@@ -32,13 +32,16 @@ hashtags** strips hashtags from video titles and descriptions on watch pages,
 cards, and Shorts, and hides hashtag links; turning it off restores the
 original text. **Remove recommended videos** hides the watch page's right
 column and expands the player, description, and comments to the full width.
-**Themes → Presets** offers **Midnight Black** and **Retro YouTube**. Midnight
-Black fills every Home color slot with a rich black background (`#050507`),
-near-black blue surfaces/sidebar/cards, and white text (icons in pale blue).
-Retro YouTube recreates the early YouTube site: white and light-gray chrome,
-blue video titles, a brick-red wordmark, Arial, 3 videos per row, and 0 px
-corners. Presets can carry layout settings — videos per row, UI corner radii,
-and font — which apply together with the colors.
+**Themes → Presets** contains **Default**, which removes every color override
+and restores the extension's base look (4 videos per row, 12 px radii, original
+font — i.e. YouTube's own CSS), and **Retro YouTube**, which recreates the
+early YouTube site: white and light-gray chrome, blue video titles, a brick-red
+wordmark, Arial, 3 videos per row, and 0 px corners. Presets can carry layout
+settings — videos per row, UI corner radii, and font — which apply together
+with the colors. **Save** opens a dialog to overwrite an existing preset or
+store the current settings as a new one; each row has a delete button.
+**Export** downloads all presets as JSON and **Load** imports that file back
+(merging presets by id). Saved presets live in `chrome.storage.local`.
 Under **Themes → Home**, a nested list of color fields covers the home page's
 search bar (surface and text), search button (surface and decal), Ask YouTube
 button (surface and text, hidden while that element is removed), microphone

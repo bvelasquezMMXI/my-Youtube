@@ -27,6 +27,18 @@ const noRecommendedOption = document.getElementById("no-recommended");
 const noRecommendedCheckbox = document.getElementById("no-recommended-checkbox");
 const themePresetsPanel = document.getElementById("theme-presets");
 const presetList = document.getElementById("preset-list");
+const presetSaveButton = document.getElementById("preset-save");
+const presetLoadButton = document.getElementById("preset-load");
+const presetExportButton = document.getElementById("preset-export");
+const presetFile = document.getElementById("preset-file");
+const presetEmpty = document.getElementById("preset-empty");
+const presetStatus = document.getElementById("preset-status");
+const presetDialog = document.getElementById("preset-dialog");
+const presetChoices = document.getElementById("preset-choices");
+const presetNewName = document.getElementById("preset-new-name");
+const presetDialogStatus = document.getElementById("preset-dialog-status");
+const presetDialogSave = document.getElementById("preset-dialog-save");
+const presetDialogCancel = document.getElementById("preset-dialog-cancel");
 const themeHomeColors = document.getElementById("theme-home-colors");
 const themeHomeTree = document.getElementById("theme-home-tree");
 const themeHomeReset = document.getElementById("theme-home-reset");
@@ -127,44 +139,12 @@ const homeColorSpec = [
   }
 ];
 
-const themePresets = [
+const defaultThemePresets = [
   {
-    id: "midnight-black",
-    name: "Midnight Black",
-    colors: {
-      pageBackground: "#050507",
-      sidebar: "#0a1222",
-      "sidebar.text": "#ffffff",
-      "sidebar.sectionTitle": "#ffffff",
-      "sidebar.icon": "#9fb4e0",
-      "sidebar.selected": "#16264a",
-      "sidebar.divider": "#1b2a49",
-      searchBar: "#0d1730",
-      "searchBar.text": "#ffffff",
-      searchButton: "#101c3a",
-      "searchButton.decal": "#ffffff",
-      askButton: "#101c3a",
-      "askButton.text": "#ffffff",
-      micButton: "#101c3a",
-      "micButton.decal": "#ffffff",
-      createButton: "#101c3a",
-      "createButton.text": "#ffffff",
-      logoText: "#ffffff",
-      notificationBell: "#101c3a",
-      "notificationBell.icon": "#ffffff",
-      sidebarExpander: "#050507",
-      "sidebarExpander.icon": "#ffffff",
-      filterBar: "#080d19",
-      "filterBar.options": "#0d1730",
-      "filterBar.options.text": "#ffffff",
-      "filterBar.options.selected": "#1b3260",
-      "filterBar.options.selectedText": "#ffffff",
-      video: "#070b14",
-      "video.title": "#ffffff",
-      "video.meta": "#aebbd6",
-      "video.length": "#0b1428",
-      "video.length.text": "#ffffff"
-    }
+    id: "default",
+    name: "Default",
+    settings: { videosPerRow: 4, uiRadius: 12, fontFamily: "" },
+    colors: {}
   },
   {
     id: "retro-youtube",
@@ -206,6 +186,12 @@ const themePresets = [
     }
   }
 ];
+
+let presetStore = defaultThemePresets.map((preset) => ({
+  ...preset,
+  settings: preset.settings ? { ...preset.settings } : undefined,
+  colors: { ...preset.colors }
+}));
 
 const homeColorState = Object.create(null);
 let homeColorSamples = Object.create(null);
@@ -436,10 +422,41 @@ function applyPreset(preset) {
   if (Object.keys(updates).length) saveSync(updates);
 }
 
+function makePresetId() {
+  return `preset-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+}
+
+function persistPresets() {
+  localStore?.set({ presets: presetStore });
+}
+
+function presetMetaText(preset) {
+  if (!preset.settings) return "";
+  const parts = [];
+  if (Number.isFinite(preset.settings.videosPerRow)) parts.push(`${preset.settings.videosPerRow} per row`);
+  if (Number.isFinite(preset.settings.uiRadius)) parts.push(`${preset.settings.uiRadius} px radii`);
+  if (typeof preset.settings.fontFamily === "string" && preset.settings.fontFamily) {
+    const option = Array.from(fontSelect.options).find((item) => item.value === preset.settings.fontFamily);
+    parts.push(option ? option.textContent : "Custom font");
+  }
+  return parts.join(" \u00b7 ");
+}
+
+let presetStatusTimer = 0;
+function showPresetStatus(message) {
+  presetStatus.textContent = message;
+  presetStatus.hidden = false;
+  clearTimeout(presetStatusTimer);
+  presetStatusTimer = setTimeout(() => {
+    presetStatus.hidden = true;
+  }, 3000);
+}
+
 function renderPresets() {
   presetList.replaceChildren();
+  presetEmpty.hidden = presetStore.length > 0;
 
-  for (const preset of themePresets) {
+  for (const preset of presetStore) {
     const row = document.createElement("div");
     row.className = "preset-row";
 
@@ -451,26 +468,25 @@ function renderPresets() {
     name.textContent = preset.name;
     info.append(name);
 
-    if (preset.settings) {
+    const metaText = presetMetaText(preset);
+    if (metaText) {
       const meta = document.createElement("span");
       meta.className = "preset-meta";
-      const parts = [];
-      if (Number.isFinite(preset.settings.videosPerRow)) parts.push(`${preset.settings.videosPerRow} per row`);
-      if (Number.isFinite(preset.settings.uiRadius)) parts.push(`${preset.settings.uiRadius} px radii`);
-      if (typeof preset.settings.fontFamily === "string" && preset.settings.fontFamily) {
-        const option = Array.from(fontSelect.options).find((item) => item.value === preset.settings.fontFamily);
-        parts.push(option ? option.textContent : "Custom font");
-      }
-      meta.textContent = parts.join(" \u00b7 ");
+      meta.textContent = metaText;
       info.append(meta);
     }
 
     const swatches = document.createElement("span");
     swatches.className = "preset-swatches";
+    const swatchFallbacks = {
+      pageBackground: "#ffffff",
+      sidebar: "#f7f7f7",
+      "filterBar.options.selected": "#0f0f0f"
+    };
     for (const key of ["pageBackground", "sidebar", "filterBar.options.selected"]) {
       const swatch = document.createElement("span");
       swatch.className = "preset-swatch";
-      swatch.style.backgroundColor = preset.colors[key] || "#000000";
+      swatch.style.backgroundColor = preset.colors[key] || swatchFallbacks[key] || "#888888";
       swatches.append(swatch);
     }
 
@@ -486,10 +502,194 @@ function renderPresets() {
       }, 1200);
     });
 
-    row.append(info, swatches, apply);
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "preset-delete";
+    remove.textContent = "\u00d7";
+    remove.title = `Delete ${preset.name}`;
+    remove.setAttribute("aria-label", `Delete ${preset.name}`);
+    remove.addEventListener("click", () => {
+      presetStore = presetStore.filter((item) => item !== preset);
+      persistPresets();
+      renderPresets();
+      showPresetStatus(`Deleted ${preset.name}.`);
+    });
+
+    row.append(info, swatches, apply, remove);
     presetList.append(row);
   }
 }
+
+function currentPresetData() {
+  const colors = {};
+  for (const [key, value] of Object.entries(homeColorState)) {
+    const hex = normalizeHexColor(value);
+    if (hex) colors[key] = hex;
+  }
+  return {
+    colors,
+    settings: {
+      videosPerRow: Number(rowRange.value),
+      uiRadius: Number(cornerRange.value),
+      fontFamily: fontSelect.value || ""
+    }
+  };
+}
+
+function updatePresetNameState() {
+  const selected = presetChoices.querySelector('input[name="preset-target"]:checked');
+  const isNew = !selected || selected.value === "__new__";
+  presetNewName.disabled = !isNew;
+  presetNewName.placeholder = isNew ? "My preset" : "";
+}
+
+function openPresetDialog() {
+  presetChoices.replaceChildren();
+
+  for (const preset of presetStore) {
+    const label = document.createElement("label");
+    label.className = "preset-choice";
+    const radio = document.createElement("input");
+    radio.type = "radio";
+    radio.name = "preset-target";
+    radio.value = preset.id;
+    radio.addEventListener("change", updatePresetNameState);
+    label.append(radio, document.createTextNode(preset.name));
+    presetChoices.append(label);
+  }
+
+  const newLabel = document.createElement("label");
+  newLabel.className = "preset-choice";
+  const newRadio = document.createElement("input");
+  newRadio.type = "radio";
+  newRadio.name = "preset-target";
+  newRadio.value = "__new__";
+  newRadio.checked = true;
+  newRadio.addEventListener("change", updatePresetNameState);
+  newLabel.append(newRadio, document.createTextNode("Create new preset"));
+  presetChoices.append(newLabel);
+
+  presetNewName.value = "";
+  presetDialogStatus.hidden = true;
+  updatePresetNameState();
+  presetDialog.hidden = false;
+  presetNewName.focus();
+}
+
+function closePresetDialog() {
+  presetDialog.hidden = true;
+}
+
+function savePresetFromDialog() {
+  const { colors, settings } = currentPresetData();
+  const selected = presetChoices.querySelector('input[name="preset-target"]:checked');
+  const target = selected ? selected.value : "__new__";
+
+  if (target === "__new__") {
+    const name = presetNewName.value.trim();
+    if (!name) {
+      presetDialogStatus.textContent = "Enter a preset name.";
+      presetDialogStatus.hidden = false;
+      return;
+    }
+    presetStore.push({ id: makePresetId(), name: name.slice(0, 40), settings, colors });
+  } else {
+    const preset = presetStore.find((item) => item.id === target);
+    if (!preset) return;
+    preset.settings = settings;
+    preset.colors = colors;
+  }
+
+  persistPresets();
+  renderPresets();
+  closePresetDialog();
+  showPresetStatus(target === "__new__" ? "Preset saved." : "Preset overwritten.");
+}
+
+function sanitizePreset(raw) {
+  if (!raw || typeof raw !== "object") return null;
+
+  const colors = {};
+  const sourceColors = raw.colors && typeof raw.colors === "object" ? raw.colors : {};
+  for (const [key, value] of Object.entries(sourceColors)) {
+    const hex = normalizeHexColor(value);
+    if (hex) colors[key] = hex;
+  }
+
+  const settings = {};
+  const sourceSettings = raw.settings && typeof raw.settings === "object" ? raw.settings : {};
+  if (sourceSettings.videosPerRow !== undefined && sourceSettings.videosPerRow !== null &&
+    Number.isFinite(Number(sourceSettings.videosPerRow))) {
+    settings.videosPerRow = clampRowValue(Number(sourceSettings.videosPerRow));
+  }
+  if (sourceSettings.uiRadius !== undefined && sourceSettings.uiRadius !== null &&
+    Number.isFinite(Number(sourceSettings.uiRadius))) {
+    settings.uiRadius = clampCornerValue(Number(sourceSettings.uiRadius));
+  }
+  if (typeof sourceSettings.fontFamily === "string") settings.fontFamily = sourceSettings.fontFamily;
+
+  const name = typeof raw.name === "string" && raw.name.trim() ? raw.name.trim().slice(0, 40) : "Imported preset";
+  const id = typeof raw.id === "string" && raw.id.trim() ? raw.id.trim() : makePresetId();
+  return { id, name, settings, colors };
+}
+
+function exportPresets() {
+  const blob = new Blob([JSON.stringify({ version: 1, presets: presetStore }, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "youtube-customizer-presets.json";
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  showPresetStatus(`Exported ${presetStore.length} preset${presetStore.length === 1 ? "" : "s"}.`);
+}
+
+function importPresetFile() {
+  const file = presetFile.files && presetFile.files[0];
+  presetFile.value = "";
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onerror = () => showPresetStatus("Could not read the file.");
+  reader.onload = () => {
+    let parsed;
+    try {
+      parsed = JSON.parse(typeof reader.result === "string" ? reader.result : "");
+    } catch (error) {
+      showPresetStatus("Invalid preset file.");
+      return;
+    }
+    const incoming = Array.isArray(parsed) ? parsed : parsed && Array.isArray(parsed.presets) ? parsed.presets : null;
+    if (!incoming) {
+      showPresetStatus("Invalid preset file.");
+      return;
+    }
+    const clean = incoming.map(sanitizePreset).filter(Boolean);
+    if (!clean.length) {
+      showPresetStatus("No presets found.");
+      return;
+    }
+    for (const preset of clean) {
+      const index = presetStore.findIndex((item) => item.id === preset.id);
+      if (index === -1) presetStore.push(preset);
+      else presetStore[index] = preset;
+    }
+    persistPresets();
+    renderPresets();
+    showPresetStatus(`Loaded ${clean.length} preset${clean.length === 1 ? "" : "s"}.`);
+  };
+  reader.readAsText(file);
+}
+
+presetSaveButton.addEventListener("click", openPresetDialog);
+presetDialogCancel.addEventListener("click", closePresetDialog);
+presetDialog.addEventListener("click", (event) => {
+  if (event.target === presetDialog) closePresetDialog();
+});
+presetDialogSave.addEventListener("click", savePresetFromDialog);
+presetLoadButton.addEventListener("click", () => presetFile.click());
+presetFile.addEventListener("change", importPresetFile);
+presetExportButton.addEventListener("click", exportPresets);
 
 function requestHomeColorSamples() {
   if (homeColorSamplesRequested) return;
@@ -745,13 +945,24 @@ const settingsDefaults = {
 renderSidebarTree();
 
 if (localStore?.get) {
-  localStore.get({ customFonts: [], sidebarTree: [], sidebarDisabled: [], homeBackgroundImage: "" }, (local) => {
+  localStore.get({ customFonts: [], sidebarTree: [], sidebarDisabled: [], homeBackgroundImage: "", presets: null, presetsVersion: 0 }, (local) => {
     appendCustomFonts(local.customFonts);
     sidebarItems = Array.isArray(local.sidebarTree) ? local.sidebarTree : [];
     sidebarDisabled = new Set(Array.isArray(local.sidebarDisabled) ? local.sidebarDisabled.filter((key) => typeof key === "string") : []);
     homeBackgroundImage = typeof local.homeBackgroundImage === "string" ? local.homeBackgroundImage : "";
+    if (Array.isArray(local.presets)) {
+      presetStore = local.presets.map(sanitizePreset).filter(Boolean);
+      if ((local.presetsVersion || 0) < 2) {
+        presetStore = presetStore.filter((preset) => preset.id !== "midnight-black");
+        if (!presetStore.some((preset) => preset.id === "default")) presetStore.unshift(defaultThemePresets[0]);
+        localStore.set({ presets: presetStore, presetsVersion: 2 });
+      }
+    } else {
+      localStore.set({ presets: presetStore, presetsVersion: 2 });
+    }
     renderSidebarTree();
     renderHomeBackgroundImage();
+    renderPresets();
   });
 }
 
