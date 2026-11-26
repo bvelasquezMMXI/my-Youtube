@@ -68,7 +68,11 @@ const homeColorSpec = [
         key: "filterBar.options",
         label: "Options",
         fallback: "#f2f2f2",
-        children: [{ key: "filterBar.options.text", label: "Text color", fallback: "#0f0f0f" }]
+        children: [
+          { key: "filterBar.options.text", label: "Text color", fallback: "#0f0f0f" },
+          { key: "filterBar.options.selected", label: "Selected color", fallback: "#0f0f0f" },
+          { key: "filterBar.options.selectedText", label: "Selected text color", fallback: "#f1f1f1" }
+        ]
       }
     ]
   },
@@ -88,7 +92,18 @@ const homeColorSpec = [
     ]
   },
   { key: "pageBackground", label: "Page background", fallback: "#ffffff" },
-  { key: "sidebar", label: "Sidebar", fallback: "#ffffff" }
+  {
+    key: "sidebar",
+    label: "Sidebar",
+    fallback: "#ffffff",
+    children: [
+      { key: "sidebar.text", label: "Text color", fallback: "#0f0f0f" },
+      { key: "sidebar.sectionTitle", label: "Section title color", fallback: "#0f0f0f" },
+      { key: "sidebar.icon", label: "Icon color", fallback: "#0f0f0f" },
+      { key: "sidebar.selected", label: "Selected item color", fallback: "#f2f2f2" },
+      { key: "sidebar.divider", label: "Divider color", fallback: "#cccccc" }
+    ]
+  }
 ];
 
 const homeColorState = Object.create(null);

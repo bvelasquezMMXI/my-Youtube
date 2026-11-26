@@ -66,6 +66,7 @@ const SEARCH_BUTTON_SELECTOR = [
   "yt-searchbox button-view-model button[aria-label='Search']"
 ].join(", ");
 const CHIP_OPTION_SCOPE = "ytd-feed-filter-chip-bar-renderer yt-chip-cloud-chip-renderer:not([selected]):not(.iron-selected)";
+const CHIP_SELECTED_SCOPE = "ytd-feed-filter-chip-bar-renderer yt-chip-cloud-chip-renderer:is([selected], .iron-selected)";
 const HOME_COLOR_RULES = {
   searchBar: [["yt-searchbox .ytSearchboxComponentInputBox", "background-color"]],
   "searchBar.text": [
@@ -84,6 +85,8 @@ const HOME_COLOR_RULES = {
   filterBar: [["#chips-wrapper", "background-color"]],
   "filterBar.options": [[`${CHIP_OPTION_SCOPE} .ytChipShapeChip`, "background-color"]],
   "filterBar.options.text": [[`${CHIP_OPTION_SCOPE} .ytChipShapeText, ${CHIP_OPTION_SCOPE} .ytChipShapeChip`, "color"]],
+  "filterBar.options.selected": [[`${CHIP_SELECTED_SCOPE} .ytChipShapeChip`, "background-color"]],
+  "filterBar.options.selectedText": [[`${CHIP_SELECTED_SCOPE} .ytChipShapeText, ${CHIP_SELECTED_SCOPE} .ytChipShapeChip`, "color"]],
   video: [["ytd-rich-item-renderer", "background-color"]],
   "video.title": [["ytd-rich-item-renderer .ytLockupMetadataViewModelTitle, ytd-rich-item-renderer #video-title", "color"]],
   "video.meta": [["ytd-rich-item-renderer .ytContentMetadataViewModelMetadataText, ytd-rich-item-renderer #metadata-line", "color"]],
@@ -96,7 +99,19 @@ const HOME_COLOR_RULES = {
   ],
   sidebar: [
     ["ytd-guide-renderer, ytd-mini-guide-renderer, #guide-content, #guide-inner-content", "background-color"]
-  ]
+  ],
+  "sidebar.text": [
+    ["ytd-guide-renderer :is(yt-formatted-string, yt-attributed-string, .yt-core-attributed-string)", "color"]
+  ],
+  "sidebar.sectionTitle": [["ytd-guide-renderer #guide-section-title", "color"]],
+  "sidebar.icon": [
+    ["ytd-guide-renderer yt-icon", "color"],
+    ["ytd-guide-renderer yt-icon", "fill"]
+  ],
+  "sidebar.selected": [
+    ["ytd-guide-renderer ytd-guide-entry-renderer[active], ytd-mini-guide-entry-renderer[active]", "background-color"]
+  ],
+  "sidebar.divider": [["ytd-guide-renderer ytd-guide-section-renderer", "border-bottom-color"]]
 };
 const HOME_COLOR_SAMPLE_RULES = {
   searchBar: ["yt-searchbox .ytSearchboxComponentInputBox", "backgroundColor"],
@@ -110,13 +125,20 @@ const HOME_COLOR_SAMPLE_RULES = {
   filterBar: ["#chips-wrapper", "backgroundColor"],
   "filterBar.options": [`${CHIP_OPTION_SCOPE} .ytChipShapeChip`, "backgroundColor"],
   "filterBar.options.text": [`${CHIP_OPTION_SCOPE} .ytChipShapeText`, "color"],
+  "filterBar.options.selected": [`${CHIP_SELECTED_SCOPE} .ytChipShapeChip`, "backgroundColor"],
+  "filterBar.options.selectedText": [`${CHIP_SELECTED_SCOPE} .ytChipShapeText`, "color"],
   video: ["ytd-rich-item-renderer :is(yt-lockup-view-model, ytd-video-renderer)", "backgroundColor"],
   "video.title": ["ytd-rich-item-renderer .ytLockupMetadataViewModelTitle, ytd-rich-item-renderer #video-title", "color"],
   "video.meta": ["ytd-rich-item-renderer .ytContentMetadataViewModelMetadataText, ytd-rich-item-renderer #metadata-line", "color"],
   "video.length": ["ytd-rich-item-renderer .ytBadgeShapeThumbnailBadge", "backgroundColor"],
   "video.length.text": ["ytd-rich-item-renderer .ytBadgeShapeThumbnailBadge .ytBadgeShapeText", "color"],
   pageBackground: ["ytd-app", "backgroundColor"],
-  sidebar: ["ytd-guide-renderer, #guide-content, #guide-inner-content", "backgroundColor"]
+  sidebar: ["ytd-guide-renderer, #guide-content, #guide-inner-content", "backgroundColor"],
+  "sidebar.text": ["ytd-guide-renderer yt-formatted-string.title", "color"],
+  "sidebar.sectionTitle": ["ytd-guide-renderer #guide-section-title", "color"],
+  "sidebar.icon": ["ytd-guide-renderer yt-icon.guide-icon", "color"],
+  "sidebar.selected": ["ytd-guide-renderer ytd-guide-entry-renderer[active]", "backgroundColor"],
+  "sidebar.divider": ["ytd-guide-renderer ytd-guide-section-renderer", "borderBottomColor"]
 };
 // Static declarations applied alongside a color, used where a color alone is
 // not enough (the masthead's frosted-glass layer must lose its blur).
@@ -124,6 +146,11 @@ const HOME_COLOR_STATIC_RULES = {
   pageBackground: [
     ["#frosted-glass", "backdrop-filter:none !important"],
     ["#frosted-glass", "-webkit-backdrop-filter:none !important"]
+  ],
+  filterBar: [
+    ["#chips-wrapper", "padding-inline:12px !important"],
+    ["#chips-wrapper", "box-sizing:border-box !important"],
+    ["#chips-wrapper", "background-clip:content-box !important"]
   ]
 };
 const SIDEBAR_KEY_ATTR = "data-ytc-sidebar-key";
@@ -360,10 +387,17 @@ if (typeof ResizeObserver === "function") {
   });
 }
 
-const VIDEO_HEIGHT_TRIM = 30;
+const VIDEO_HEIGHT_TRIM = 50;
+const gappedVideoItems = new Set();
+
+function clearVideoGaps() {
+  for (const item of gappedVideoItems) item.style.removeProperty("margin-bottom");
+  gappedVideoItems.clear();
+}
 
 function syncHomeVideoHeight() {
   const root = document.documentElement;
+  clearVideoGaps();
   if (!isHomeFeed() || !normalizeHomeColor(currentHomeColors.video)) {
     root.style.removeProperty("--ytc-video-card-height");
     delete root.dataset.ytcVideoHeight;
@@ -373,7 +407,8 @@ function syncHomeVideoHeight() {
   delete root.dataset.ytcVideoHeight;
   root.style.removeProperty("--ytc-video-card-height");
   let tallest = 0;
-  const items = document.querySelectorAll("ytd-rich-grid-renderer ytd-rich-item-renderer");
+  let baseGap = 36;
+  const items = Array.from(document.querySelectorAll("ytd-rich-grid-renderer ytd-rich-item-renderer"));
   for (const item of items) {
     const height = item.getBoundingClientRect().height;
     if (height > tallest) tallest = height;
@@ -382,10 +417,23 @@ function syncHomeVideoHeight() {
       videoHeightObserver?.observe(item);
     }
   }
-  if (tallest > 0) {
-    const height = Math.max(1, Math.ceil(tallest) - VIDEO_HEIGHT_TRIM);
-    root.style.setProperty("--ytc-video-card-height", `${height}px`);
-    root.dataset.ytcVideoHeight = "1";
+  if (!items.length) return;
+  baseGap = Number.parseFloat(getComputedStyle(items[0]).marginBottom) || 36;
+
+  if (tallest <= 0) return;
+  const height = Math.max(1, Math.ceil(tallest) - VIDEO_HEIGHT_TRIM);
+  root.style.setProperty("--ytc-video-card-height", `${height}px`);
+  root.dataset.ytcVideoHeight = "1";
+
+  // Ads can be taller than the trimmed card. Give only those cards a larger
+  // bottom gap so their overflowing controls never reach the next row.
+  for (const item of items) {
+    const content = item.querySelector(":scope > #content")?.firstElementChild;
+    if (!content) continue;
+    const overflow = content.getBoundingClientRect().height - height;
+    if (overflow <= 0) continue;
+    item.style.marginBottom = `${Math.ceil(Math.max(baseGap, overflow + 8))}px`;
+    gappedVideoItems.add(item);
   }
 }
 

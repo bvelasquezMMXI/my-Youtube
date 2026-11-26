@@ -38,7 +38,12 @@ button (surface and text, hidden while that element is removed), microphone
 (surface and decal), filter bar (bar, options, and option text), and video
 cards (card, title, stats/channel line, length badge, and badge text), the page
 background (including the frosted band behind the search and filter bars), and
-the sidebar. Every row has a color rectangle plus an editable
+the sidebar. The sidebar expands into text, section title, icon, selected item,
+and divider colors. A colored filter bar is inset 12 px from both sides
+(`background-clip: content-box`) so it clears the sidebar and the page edge.
+Filter options also expose selected and selected-text colors for the active
+chip.
+Every row has a color rectangle plus an editable
 hex field; both start at the color YouTube currently uses, update the page
 while they are edited, and the ↺ button restores the native color. The search
 placeholder is derived automatically, 15% darker than the chosen search text
@@ -48,9 +53,10 @@ background color with a stored picture (with Remove to delete it). **Reset all
 colors** clears every color override at once. Picks persist in
 `chrome.storage.sync` as `homeColors`; the background image lives in
 `chrome.storage.local` as `homeBackgroundImage`. When the Video color is set,
-every home card is pinned to the tallest card's height minus 30 px so the
+every home card is pinned to the tallest card's height minus 50 px so the
 filled rectangles line up; text, thumbnails, and controls keep their natural
-sizes.
+sizes. Cards whose content is taller than the trimmed height (ads with call to
+action buttons) get extra bottom spacing so nothing overlaps the next row.
 
 ## Structure
 
