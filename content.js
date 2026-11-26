@@ -32,6 +32,8 @@ const DISLIKE_HOST_SELECTOR = "segmented-like-dislike-button-view-model, ytd-seg
 
 const NO_RADIUS_ATTR = "data-ytc-no-radius";
 const NO_RADIUS_SELECTOR = [
+  ".ytp-spinner",
+  ".ytp-spinner-container",
   ".ytp-progress-bar-container",
   ".ytp-tooltip-progress-bar-pill",
   ".ytp-autonav-toggle",
@@ -43,17 +45,10 @@ const NO_RADIUS_SELECTOR = [
   ".ytd-thumbnail-overlay-resume-playback-renderer"
 ].join(", ");
 const SIDEBAR_KEY_ATTR = "data-ytc-sidebar-key";
-const SIDEBAR_HIDDEN_CLASS = "ytc-sidebar-hidden";
+const SIDEBAR_DISABLED_CLASS = "ytc-sidebar-disabled";
 const SIDEBAR_TREE_STORAGE_KEY = "sidebarTree";
-const SIDEBAR_STATE_VERSION = 2;
-const SUBSCRIPTIONS_SECTION_ATTR = "data-ytc-subscriptions-section";
-const YOU_SECTION_ATTR = "data-ytc-you-section";
-const SUBSCRIPTION_NAME_ATTR = "data-ytc-subscription-name";
-const SUBSCRIPTIONS_REDACTED_CLASS = "ytc-subscriptions-redacted";
-const SUBSCRIPTION_HIDE_KEY = "subscriptions:hide-names";
 const GUIDE_TREE_TTL = 10 * 60 * 1000;
 const GUIDE_FETCH_BACKOFF = 60 * 1000;
-
 
 let currentVideosPerRow = DEFAULT_VIDEOS_PER_ROW;
 let currentUiRadius = DEFAULT_UI_RADIUS;
@@ -64,7 +59,7 @@ let noAISetting = false;
 let removeHashtagsEnabled = false;
 let hashtagTextOriginals = new Map();
 let introStyle = null;
-let sidebarHiddenKeys = new Set();
+let sidebarDisabledKeys = new Set();
 let lastSidebarTreeJSON = "";
 let guideTreeCache = null;
 let guideTreeCacheTime = 0;
@@ -517,6 +512,14 @@ function sidebarEntryHref(entry) {
   return entry.querySelector("a#endpoint[href], a[href]")?.getAttribute("href") || "";
 }
 
+function isSubscriptionsTitle(value) {
+  return /^subscriptions$/i.test(normalizeSidebarText(value));
+}
+
+function isChannelEntry(entry) {
+  return /^\/(?:@|channel\/)/i.test(sidebarEntryHref(entry));
+}
+
 function addSidebarItem(tree, item) {
   if (!item || !item.key) return;
   const existing = tree.find((candidate) => candidate.key === item.key);
@@ -578,31 +581,6 @@ function collectCollapsibleEntries(collapsible, scope, usedKeys) {
     entries.push({ key, title, children: [] });
   }
   return entries;
-}
-
-function markCollapsibleSubscriptionNames(collapsible) {
-  collapsible.setAttribute(SUBSCRIPTIONS_SECTION_ATTR, "");
-  for (const entry of collapsible.querySelectorAll("ytd-guide-entry-renderer")) {
-    if (entry.closest("ytd-guide-collapsible-section-entry-renderer") !== collapsible) continue;
-    if (entry.closest("#header")) continue;
-    const title = sidebarEntryTitle(entry);
-    if (!title || /^show (?:more|less)$/i.test(title)) continue;
-    if (!entry.hasAttribute(SUBSCRIPTION_NAME_ATTR)) {
-      entry.setAttribute(SUBSCRIPTION_NAME_ATTR, "");
-    }
-  }
-}
-
-function markSubscriptionNames(section) {
-  section.setAttribute(SUBSCRIPTIONS_SECTION_ATTR, "");
-  for (const entry of section.querySelectorAll("ytd-guide-entry-renderer")) {
-    if (entry.closest("ytd-guide-section-renderer") !== section) continue;
-    const title = sidebarEntryTitle(entry);
-    if (!title || /^show (?:more|less)$/i.test(title)) continue;
-    if (!entry.hasAttribute(SUBSCRIPTION_NAME_ATTR)) {
-      entry.setAttribute(SUBSCRIPTION_NAME_ATTR, "");
-    }
-  }
 }
 
 function findSidebarTreeItem(tree, predicate) {
@@ -676,25 +654,19 @@ function buildSidebarTree() {
 
       const title = sidebarSectionTitle(section);
       if (title) {
-        const key = uniqueSidebarKey(usedKeys, `section:${sidebarKeyText(title)}`);
+        const subscriptions = isSubscriptionsTitle(title);
+        const key = subscriptions
+          ? "section:subscriptions"
+          : uniqueSidebarKey(usedKeys, `section:${sidebarKeyText(title)}`);
+        usedKeys.add(key);
         markSidebarElement(section, key);
-        if (/^you$/i.test(title)) section.setAttribute(YOU_SECTION_ATTR, "");
-        else section.removeAttribute(YOU_SECTION_ATTR);
-
-        if (/^subscriptions$/i.test(title)) {
-          markSubscriptionNames(section);
-          addSidebarItem(tree, {
-            key,
-            title,
-            children: [{
-              key: SUBSCRIPTION_HIDE_KEY,
-              title: "Redact subscriptions (weirdo)",
-              children: [],
-              inverted: true
-            }]
-          });
+        if (subscriptions) {
+          for (const entry of section.querySelectorAll("ytd-guide-entry-renderer")) {
+            if (entry.closest("ytd-guide-section-renderer") !== section) continue;
+            markSidebarElement(entry, key);
+          }
+          addSidebarItem(tree, { key, title: "Subscriptions", children: [] });
         } else {
-          section.removeAttribute(SUBSCRIPTIONS_SECTION_ATTR);
           addSidebarItem(tree, {
             key,
             title,
@@ -702,37 +674,42 @@ function buildSidebarTree() {
           });
         }
       } else {
-        for (const node of section.querySelectorAll("ytd-guide-entry-renderer, ytd-guide-collapsible-section-entry-renderer")) {
-          if (node.closest("ytd-guide-section-renderer") !== section) continue;
-          if (node.matches("ytd-guide-entry-renderer") && node.closest("ytd-guide-collapsible-section-entry-renderer")) continue;
-          if (node.matches("ytd-guide-collapsible-section-entry-renderer") && node.closest("ytd-guide-collapsible-section-entry-renderer") !== node) continue;
+        const nodes = Array.from(section.querySelectorAll("ytd-guide-entry-renderer, ytd-guide-collapsible-section-entry-renderer"))
+          .filter((node) => node.closest("ytd-guide-section-renderer") === section)
+          .filter((node) => !(node.matches("ytd-guide-entry-renderer") && node.closest("ytd-guide-collapsible-section-entry-renderer")))
+          .filter((node) => !(node.matches("ytd-guide-collapsible-section-entry-renderer") && node.closest("ytd-guide-collapsible-section-entry-renderer") !== node));
+        const directEntries = nodes.filter((node) => {
+          if (!node.matches("ytd-guide-entry-renderer")) return false;
+          const title = sidebarEntryTitle(node);
+          return title && !/^show (?:more|less)$/i.test(title);
+        });
+        const subscriptionsCollapsible = nodes.find((node) =>
+          node.matches("ytd-guide-collapsible-section-entry-renderer") && isSubscriptionsTitle(sidebarCollapsibleTitle(node))
+        );
+        const directChannels = directEntries.filter(isChannelEntry);
+        const subscriptionsContext = Boolean(subscriptionsCollapsible) ||
+          (directEntries.length > 0 && directChannels.length === directEntries.length);
 
+        if (subscriptionsContext) {
+          const key = "section:subscriptions";
+          usedKeys.add(key);
+          if (subscriptionsCollapsible) markSidebarElement(subscriptionsCollapsible, key);
+          for (const entry of directChannels) markSidebarElement(entry, key);
+          addSidebarItem(tree, { key, title: "Subscriptions", children: [] });
+        }
+
+        for (const node of nodes) {
+          if (subscriptionsContext && (node === subscriptionsCollapsible || directChannels.includes(node))) continue;
           if (node.matches("ytd-guide-collapsible-section-entry-renderer")) {
             const title = sidebarCollapsibleTitle(node);
             if (!title) continue;
             const key = uniqueSidebarKey(usedKeys, `section:${sidebarKeyText(title)}`);
             markSidebarElement(node, key);
-            if (/^you$/i.test(title)) node.setAttribute(YOU_SECTION_ATTR, "");
-            else node.removeAttribute(YOU_SECTION_ATTR);
-            if (/^subscriptions$/i.test(title)) {
-              markCollapsibleSubscriptionNames(node);
-              addSidebarItem(tree, {
-                key,
-                title,
-                children: [{
-                  key: SUBSCRIPTION_HIDE_KEY,
-                  title: "Redact subscriptions (weirdo)",
-                  children: [],
-                  inverted: true
-                }]
-              });
-            } else {
-              addSidebarItem(tree, {
-                key,
-                title,
-                children: collectCollapsibleEntries(node, key, usedKeys)
-              });
-            }
+            addSidebarItem(tree, {
+              key,
+              title,
+              children: /^subscriptions$/i.test(title) ? [] : collectCollapsibleEntries(node, key, usedKeys)
+            });
             continue;
           }
 
@@ -806,18 +783,13 @@ function buildGuideTreeFromData(items) {
       continue;
     }
 
-    const key = uniqueSidebarKey(usedKeys, `section:${sidebarKeyText(title)}`);
-    if (/^subscriptions$/i.test(title)) {
-      addSidebarItem(tree, {
-        key,
-        title,
-        children: [{
-          key: SUBSCRIPTION_HIDE_KEY,
-          title: "Hide Subscriptions",
-          children: [],
-          inverted: true
-        }]
-      });
+    const subscriptions = isSubscriptionsTitle(title);
+    const key = subscriptions
+      ? "section:subscriptions"
+      : uniqueSidebarKey(usedKeys, `section:${sidebarKeyText(title)}`);
+    usedKeys.add(key);
+    if (subscriptions) {
+      addSidebarItem(tree, { key, title: "Subscriptions", children: [] });
       continue;
     }
 
@@ -922,27 +894,16 @@ function fetchGuideTree() {
     });
 }
 
-function applySidebarHidden() {
+function applySidebarDisabled() {
   for (const node of document.querySelectorAll(`[${SIDEBAR_KEY_ATTR}]`)) {
     const key = node.getAttribute(SIDEBAR_KEY_ATTR);
-    node.classList.toggle(SIDEBAR_HIDDEN_CLASS, sidebarHiddenKeys.has(key));
+    node.classList.toggle(SIDEBAR_DISABLED_CLASS, sidebarDisabledKeys.has(key));
   }
-
-  const hideSubscriptions = sidebarHiddenKeys.has(SUBSCRIPTION_HIDE_KEY);
-  if (hideSubscriptions) {
-    const guide = document.querySelector("ytd-guide-renderer");
-    for (const entry of guide?.querySelectorAll("ytd-guide-entry-renderer") || []) {
-      if (entry.closest(`[${YOU_SECTION_ATTR}]`)) continue;
-      if (!entry.querySelector('a[href^="/@"], a[href^="/channel/"]')) continue;
-      entry.setAttribute(SUBSCRIPTION_NAME_ATTR, "");
-    }
-  }
-  document.documentElement.classList.toggle(SUBSCRIPTIONS_REDACTED_CLASS, hideSubscriptions);
 }
 
 function syncSidebar() {
   const domTree = buildSidebarTree();
-  applySidebarHidden();
+  applySidebarDisabled();
 
   const fullGuide = needsFullGuide();
   const useCachedGuide = Boolean(guideTreeCache) &&
@@ -1146,15 +1107,9 @@ for (const eventName of ["yt-navigate-finish", "yt-page-data-updated", "popstate
 
 
 function loadLocalSettings() {
-  globalThis.chrome?.storage?.local?.get({ customFonts: [], sidebarHidden: [], sidebarHiddenVersion: 0 }, (data) => {
+  globalThis.chrome?.storage?.local?.get({ customFonts: [], sidebarDisabled: [] }, (data) => {
     injectCustomFonts(data.customFonts);
-    if ((Number(data.sidebarHiddenVersion) || 0) < SIDEBAR_STATE_VERSION) {
-      sidebarHiddenKeys = new Set();
-      globalThis.chrome?.storage?.local?.set?.({ sidebarHidden: [], sidebarHiddenVersion: SIDEBAR_STATE_VERSION });
-    } else {
-      sidebarHiddenKeys = new Set(Array.isArray(data.sidebarHidden) ? data.sidebarHidden.filter((key) => typeof key === "string") : []);
-    }
-    applySidebarHidden();
+    sidebarDisabledKeys = new Set(Array.isArray(data.sidebarDisabled) ? data.sidebarDisabled.filter((key) => typeof key === "string") : []);
     syncSidebar();
   });
 }
@@ -1165,7 +1120,6 @@ function applySyncSettings(settings) {
   applyHoverHighlights(settings.hoverHighlights);
   applyFontFamily(settings.fontFamily);
   applyNoAI(settings.noAI);
-  syncSidebar();
   applyAddDislikes(settings.addDislikes !== false);
   applyRemoveHashtags(settings.removeHashtags);
   applyRemoveRecommended(settings.removeRecommended);
@@ -1197,8 +1151,8 @@ if (!globalThis.__ytcMessageListener) {
   globalThis.chrome?.runtime?.onMessage?.addListener((message, sender, sendResponse) => {
     if (message?.type === "ytc-apply-sidebar") {
       const keys = Array.isArray(message.keys) ? message.keys.filter((key) => typeof key === "string") : [];
-      sidebarHiddenKeys = new Set(keys);
-      syncSidebar();
+      sidebarDisabledKeys = new Set(keys);
+      applySidebarDisabled();
       sendResponse({ ok: true });
       return false;
     }
@@ -1211,9 +1165,9 @@ if (!globalThis.__ytcMessageListener) {
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "local") {
     if (changes.customFonts) injectCustomFonts(changes.customFonts.newValue);
-    if (changes.sidebarHidden) {
-      sidebarHiddenKeys = new Set(Array.isArray(changes.sidebarHidden.newValue) ? changes.sidebarHidden.newValue.filter((key) => typeof key === "string") : []);
-      applySidebarHidden();
+    if (changes.sidebarDisabled) {
+      sidebarDisabledKeys = new Set(Array.isArray(changes.sidebarDisabled.newValue) ? changes.sidebarDisabled.newValue.filter((key) => typeof key === "string") : []);
+      applySidebarDisabled();
     }
     return;
   }

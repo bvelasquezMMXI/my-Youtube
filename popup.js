@@ -29,8 +29,7 @@ const noRecommendedCheckbox = document.getElementById("no-recommended-checkbox")
 const syncStorage = globalThis.chrome?.storage?.sync;
 const localStore = globalThis.chrome?.storage?.local;
 let sidebarItems = [];
-let sidebarHidden = new Set();
-const SIDEBAR_STATE_VERSION = 2;
+let sidebarDisabled = new Set();
 
 let lastYouTubePing = 0;
 let lastYouTubeReload = 0;
@@ -190,19 +189,12 @@ function renderSidebarTree() {
     const input = document.createElement("input");
     input.type = "checkbox";
     input.className = "option-check";
-    const hidden = sidebarHidden.has(item.key);
-    input.checked = item.inverted ? hidden : !hidden;
+    input.checked = !sidebarDisabled.has(item.key);
     input.addEventListener("change", () => {
-      if (item.inverted) {
-        if (input.checked) sidebarHidden.add(item.key);
-        else sidebarHidden.delete(item.key);
-      } else if (input.checked) {
-        sidebarHidden.delete(item.key);
-      } else {
-        sidebarHidden.add(item.key);
-      }
-      const keys = Array.from(sidebarHidden);
-      localStore?.set({ sidebarHidden: keys });
+      if (input.checked) sidebarDisabled.delete(item.key);
+      else sidebarDisabled.add(item.key);
+      const keys = Array.from(sidebarDisabled);
+      localStore?.set({ sidebarDisabled: keys });
       pushSidebarState(keys);
       renderSidebarTree();
     });
@@ -211,8 +203,7 @@ function renderSidebarTree() {
     row.append(input, text);
     sidebarTree.append(row);
 
-    const showChildren = item.inverted ? true : input.checked;
-    if (!showChildren) return;
+    if (!input.checked) return;
 
     const children = Array.isArray(item.children) ? item.children : [];
     children.forEach((child, index) => addRow(child, depth + 1, index === children.length - 1));
@@ -251,15 +242,10 @@ const settingsDefaults = {
 renderSidebarTree();
 
 if (localStore?.get) {
-  localStore.get({ customFonts: [], sidebarTree: [], sidebarHidden: [], sidebarHiddenVersion: 0 }, (local) => {
+  localStore.get({ customFonts: [], sidebarTree: [], sidebarDisabled: [] }, (local) => {
     appendCustomFonts(local.customFonts);
     sidebarItems = Array.isArray(local.sidebarTree) ? local.sidebarTree : [];
-    if ((Number(local.sidebarHiddenVersion) || 0) < SIDEBAR_STATE_VERSION) {
-      sidebarHidden = new Set();
-      localStore?.set({ sidebarHidden: [], sidebarHiddenVersion: SIDEBAR_STATE_VERSION });
-    } else {
-      sidebarHidden = new Set(Array.isArray(local.sidebarHidden) ? local.sidebarHidden.filter((key) => typeof key === "string") : []);
-    }
+    sidebarDisabled = new Set(Array.isArray(local.sidebarDisabled) ? local.sidebarDisabled.filter((key) => typeof key === "string") : []);
     renderSidebarTree();
   });
 }
@@ -272,8 +258,8 @@ globalThis.chrome?.storage?.onChanged?.addListener((changes, area) => {
     sidebarItems = Array.isArray(changes.sidebarTree.newValue) ? changes.sidebarTree.newValue : [];
     renderSidebarTree();
   }
-  if (changes.sidebarHidden) {
-    sidebarHidden = new Set(Array.isArray(changes.sidebarHidden.newValue) ? changes.sidebarHidden.newValue.filter((key) => typeof key === "string") : []);
+  if (changes.sidebarDisabled) {
+    sidebarDisabled = new Set(Array.isArray(changes.sidebarDisabled.newValue) ? changes.sidebarDisabled.newValue.filter((key) => typeof key === "string") : []);
     renderSidebarTree();
   }
 });

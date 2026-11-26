@@ -21,12 +21,10 @@ watch pages. A **Font** selector offers ten choices; **Original**
 restores YouTube's unmodified fonts, while the others apply to all text. The
 **Upload** button beside it accepts woff2/woff/ttf/otf files, stores the font
 locally, injects it with `@font-face`, and appends it to the font list. The
-**Sidebar** subtab mirrors the current YouTube tab's guide, excluding footer
-links. When the guide is collapsed, the full guide is fetched so every section
-and its entries are listed without expanding the sidebar first. Sections and their entries get checkboxes, and entries are nested under
-their section with directory guides. Child options are hidden while their
-parent is unchecked. Subscriptions gets a single **Hide Subscriptions** child,
-which blurs the subscribed channel names while keeping the rows in place.
+**Sidebar** subtab lists every guide section and entry with a checkbox, and
+entries are nested under their section with directory lines. Everything is
+checked by default; unchecking hides that section or entry. Subscriptions uses
+a single checkbox that hides the whole subscription list.
 Under **Player → Main**, **Add dislikes** restores dislike counts inside the
 dislike button using the Return YouTube Dislike API. The button widens to fit
 the count; counts are cached by the background service worker. **Remove
@@ -40,8 +38,8 @@ column and expands the player, description, and comments to the full width.
 ```
 manifest.json   Extension metadata, permissions, content scripts
 background.js   Fetches and caches dislike counts
-content.js      Applies layout, sidebar, radius, font, and dislike changes
-content.css     Grid, intro, sidebar, radius, and dislike-count styling
+content.js      Applies layout, radius, font, and dislike changes
+content.css     Grid, intro, radius, and dislike-count styling
 popup.html      Popup markup
 popup.css       Popup styling
 popup.js        Settings storage and popup behavior

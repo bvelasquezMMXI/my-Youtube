@@ -77,14 +77,9 @@ html[data-ytc-videos-per-row] #home-container-media {
 }
 
 .ytc-no-ai,
-.ytc-sidebar-hidden,
+.ytc-sidebar-disabled,
 .ytc-hashtag-hidden {
   display: none !important;
-}
-
-.ytc-subscriptions-redacted [data-ytc-subscription-name] {
-  filter: blur(4px) !important;
-  user-select: none !important;
 }
 
 .ytc-dislike-count {
@@ -142,9 +137,17 @@ html[data-ytc-ui-radius] *:not(:is(
   .ytContentMetadataViewModelHost, .ytContentMetadataViewModelHost *,
   .ytContentMetadataViewModelMetadataRow, .ytContentMetadataViewModelMetadataRow *,
   .ytContentMetadataViewModelMetadataText, .ytContentMetadataViewModelMetadataText *,
+  .ytp-spinner, .ytp-spinner *,
   [data-ytc-no-radius], [data-ytc-no-radius] *
 )) {
   border-radius: var(--ytc-ui-radius) !important;
+}
+
+/* The live ring is a ::after pseudo-element, which the universal radius rule
+   cannot match. Its box sits 6px outside the avatar (4px inset + 2px band),
+   so offset the radius to keep the ring parallel to the avatar at any value. */
+html[data-ytc-ui-radius] .ytSpecAvatarShapeLiveRing::after {
+  border-radius: calc(var(--ytc-ui-radius) + 6px) !important;
 }
 
 html[data-ytc-videos-per-row] #home-container-media > .rich-grid-media-skeleton {
