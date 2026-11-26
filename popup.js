@@ -25,6 +25,8 @@ const removeHashtagsOption = document.getElementById("remove-hashtags");
 const removeHashtagsCheckbox = document.getElementById("remove-hashtags-checkbox");
 const noRecommendedOption = document.getElementById("no-recommended");
 const noRecommendedCheckbox = document.getElementById("no-recommended-checkbox");
+const themePresetsPanel = document.getElementById("theme-presets");
+const presetList = document.getElementById("preset-list");
 const themeHomeColors = document.getElementById("theme-home-colors");
 const themeHomeTree = document.getElementById("theme-home-tree");
 const themeHomeReset = document.getElementById("theme-home-reset");
@@ -59,6 +61,19 @@ const homeColorSpec = [
     fallback: "#f2f2f2",
     children: [{ key: "micButton.decal", label: "Microphone decal color", fallback: "#0f0f0f" }]
   },
+  {
+    key: "createButton",
+    label: "Create button",
+    fallback: "#f2f2f2",
+    children: [{ key: "createButton.text", label: "Text color", fallback: "#0f0f0f" }]
+  },
+  {
+    key: "notificationBell",
+    label: "Notification bell",
+    fallback: "#f2f2f2",
+    children: [{ key: "notificationBell.icon", label: "Bell color", fallback: "#0f0f0f" }]
+  },
+  { key: "logoText", label: "YouTube logo text", fallback: "#0f0f0f" },
   {
     key: "filterBar",
     label: "Filter bar",
@@ -103,6 +118,45 @@ const homeColorSpec = [
       { key: "sidebar.selected", label: "Selected item color", fallback: "#f2f2f2" },
       { key: "sidebar.divider", label: "Divider color", fallback: "#cccccc" }
     ]
+  }
+];
+
+const themePresets = [
+  {
+    id: "midnight-black",
+    name: "Midnight Black",
+    colors: {
+      pageBackground: "#050507",
+      sidebar: "#0a1222",
+      "sidebar.text": "#ffffff",
+      "sidebar.sectionTitle": "#ffffff",
+      "sidebar.icon": "#9fb4e0",
+      "sidebar.selected": "#16264a",
+      "sidebar.divider": "#1b2a49",
+      searchBar: "#0d1730",
+      "searchBar.text": "#ffffff",
+      searchButton: "#101c3a",
+      "searchButton.decal": "#ffffff",
+      askButton: "#101c3a",
+      "askButton.text": "#ffffff",
+      micButton: "#101c3a",
+      "micButton.decal": "#ffffff",
+      createButton: "#101c3a",
+      "createButton.text": "#ffffff",
+      logoText: "#ffffff",
+      notificationBell: "#101c3a",
+      "notificationBell.icon": "#ffffff",
+      filterBar: "#080d19",
+      "filterBar.options": "#0d1730",
+      "filterBar.options.text": "#ffffff",
+      "filterBar.options.selected": "#1b3260",
+      "filterBar.options.selectedText": "#ffffff",
+      video: "#070b14",
+      "video.title": "#ffffff",
+      "video.meta": "#aebbd6",
+      "video.length": "#0b1428",
+      "video.length.text": "#ffffff"
+    }
   }
 ];
 
@@ -303,6 +357,53 @@ themeBgImageRemove.addEventListener("click", () => {
 });
 
 renderHomeBackgroundImage();
+
+function applyPreset(preset) {
+  for (const key of Object.keys(homeColorState)) delete homeColorState[key];
+  for (const [key, value] of Object.entries(preset.colors)) {
+    const hex = normalizeHexColor(value);
+    if (hex) homeColorState[key] = hex;
+  }
+  renderHomeColors();
+  saveHomeColors();
+}
+
+function renderPresets() {
+  presetList.replaceChildren();
+
+  for (const preset of themePresets) {
+    const row = document.createElement("div");
+    row.className = "preset-row";
+
+    const name = document.createElement("span");
+    name.className = "preset-name";
+    name.textContent = preset.name;
+
+    const swatches = document.createElement("span");
+    swatches.className = "preset-swatches";
+    for (const key of ["pageBackground", "sidebar", "filterBar.options.selected"]) {
+      const swatch = document.createElement("span");
+      swatch.className = "preset-swatch";
+      swatch.style.backgroundColor = preset.colors[key] || "#000000";
+      swatches.append(swatch);
+    }
+
+    const apply = document.createElement("button");
+    apply.type = "button";
+    apply.className = "preset-apply";
+    apply.textContent = "Apply";
+    apply.addEventListener("click", () => {
+      applyPreset(preset);
+      apply.textContent = "Applied";
+      setTimeout(() => {
+        apply.textContent = "Apply";
+      }, 1200);
+    });
+
+    row.append(name, swatches, apply);
+    presetList.append(row);
+  }
+}
 
 function requestHomeColorSamples() {
   if (homeColorSamplesRequested) return;
@@ -731,6 +832,7 @@ function selectSubtab(tab) {
   const hasSidebarOptions = onHome && tab.dataset.label === "Sidebar";
   const hasPlayerMainOptions = onPlayer && tab.dataset.label === "Main";
   const hasThemeHomeColors = onThemes && tab.dataset.label === "Home";
+  const hasThemePresets = onThemes && tab.dataset.label === "Presets";
   videosPerRow.hidden = !hasMainOptions;
   cornerOption.hidden = !hasMainOptions;
   noAIOption.hidden = !hasMainOptions;
@@ -741,8 +843,10 @@ function selectSubtab(tab) {
   removeHashtagsOption.hidden = !hasPlayerMainOptions;
   noRecommendedOption.hidden = !hasPlayerMainOptions;
   themeHomeColors.hidden = !hasThemeHomeColors;
-  panelEmpty.hidden = hasMainOptions || hasSidebarOptions || hasPlayerMainOptions || hasThemeHomeColors;
+  themePresetsPanel.hidden = !hasThemePresets;
+  panelEmpty.hidden = hasMainOptions || hasSidebarOptions || hasPlayerMainOptions || hasThemeHomeColors || hasThemePresets;
   if (hasSidebarOptions) renderSidebarTree();
+  if (hasThemePresets) renderPresets();
   if (hasThemeHomeColors) {
     renderHomeColors();
     requestHomeColorSamples();

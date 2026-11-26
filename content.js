@@ -67,6 +67,11 @@ const SEARCH_BUTTON_SELECTOR = [
 ].join(", ");
 const CHIP_OPTION_SCOPE = "ytd-feed-filter-chip-bar-renderer yt-chip-cloud-chip-renderer:not([selected]):not(.iron-selected)";
 const CHIP_SELECTED_SCOPE = "ytd-feed-filter-chip-bar-renderer yt-chip-cloud-chip-renderer:is([selected], .iron-selected)";
+const GUIDE_SCOPE = ":is(#guide-content, #guide-inner-content, #guide, ytd-guide-renderer, ytd-mini-guide-renderer)";
+const CREATE_BUTTON_CLASS = "ytc-create-button";
+const CREATE_BUTTON_SELECTOR = ".ytc-create-button, .ytc-create-button button";
+const NOTIFICATION_BUTTON_CLASS = "ytc-notification-bell";
+const NOTIFICATION_BUTTON_SELECTOR = ".ytc-notification-bell, .ytc-notification-bell button";
 const HOME_COLOR_RULES = {
   searchBar: [["yt-searchbox .ytSearchboxComponentInputBox", "background-color"]],
   "searchBar.text": [
@@ -101,17 +106,32 @@ const HOME_COLOR_RULES = {
     ["ytd-guide-renderer, ytd-mini-guide-renderer, #guide-content, #guide-inner-content", "background-color"]
   ],
   "sidebar.text": [
-    ["ytd-guide-renderer :is(yt-formatted-string, yt-attributed-string, .yt-core-attributed-string)", "color"]
+    [`${GUIDE_SCOPE} :is(yt-formatted-string, yt-attributed-string, .yt-core-attributed-string, .title)`, "color"]
   ],
-  "sidebar.sectionTitle": [["ytd-guide-renderer #guide-section-title", "color"]],
+  "sidebar.sectionTitle": [
+    [`${GUIDE_SCOPE} #guide-section-title, ${GUIDE_SCOPE} .guide-section-title`, "color"]
+  ],
   "sidebar.icon": [
-    ["ytd-guide-renderer yt-icon", "color"],
-    ["ytd-guide-renderer yt-icon", "fill"]
+    [`${GUIDE_SCOPE} yt-icon, ${GUIDE_SCOPE} svg`, "color"],
+    [`${GUIDE_SCOPE} yt-icon, ${GUIDE_SCOPE} svg`, "fill"]
   ],
   "sidebar.selected": [
-    ["ytd-guide-renderer ytd-guide-entry-renderer[active], ytd-mini-guide-entry-renderer[active]", "background-color"]
+    [`${GUIDE_SCOPE} :is([active], [aria-current="page"], [aria-selected="true"], .iron-selected)`, "background-color"]
   ],
-  "sidebar.divider": [["ytd-guide-renderer ytd-guide-section-renderer", "border-bottom-color"]]
+  "sidebar.divider": [
+    [`${GUIDE_SCOPE} :is(ytd-guide-section-renderer, yt-guide-section-renderer, yt-guide-section)`, "border-bottom-color"]
+  ],
+  createButton: [[CREATE_BUTTON_SELECTOR, "background-color"]],
+  "createButton.text": [
+    [CREATE_BUTTON_SELECTOR, "color"],
+    [".ytc-create-button yt-icon, .ytc-create-button svg", "fill"]
+  ],
+  logoText: [["#logo-icon svg path:not([fill])", "fill"]],
+  notificationBell: [[NOTIFICATION_BUTTON_SELECTOR, "background-color"]],
+  "notificationBell.icon": [
+    [NOTIFICATION_BUTTON_SELECTOR, "color"],
+    [".ytc-notification-bell yt-icon, .ytc-notification-bell svg", "fill"]
+  ]
 };
 const HOME_COLOR_SAMPLE_RULES = {
   searchBar: ["yt-searchbox .ytSearchboxComponentInputBox", "backgroundColor"],
@@ -134,11 +154,16 @@ const HOME_COLOR_SAMPLE_RULES = {
   "video.length.text": ["ytd-rich-item-renderer .ytBadgeShapeThumbnailBadge .ytBadgeShapeText", "color"],
   pageBackground: ["ytd-app", "backgroundColor"],
   sidebar: ["ytd-guide-renderer, #guide-content, #guide-inner-content", "backgroundColor"],
-  "sidebar.text": ["ytd-guide-renderer yt-formatted-string.title", "color"],
-  "sidebar.sectionTitle": ["ytd-guide-renderer #guide-section-title", "color"],
-  "sidebar.icon": ["ytd-guide-renderer yt-icon.guide-icon", "color"],
-  "sidebar.selected": ["ytd-guide-renderer ytd-guide-entry-renderer[active]", "backgroundColor"],
-  "sidebar.divider": ["ytd-guide-renderer ytd-guide-section-renderer", "borderBottomColor"]
+  "sidebar.text": [`${GUIDE_SCOPE} yt-formatted-string.title, ${GUIDE_SCOPE} .title`, "color"],
+  "sidebar.sectionTitle": [`${GUIDE_SCOPE} #guide-section-title, ${GUIDE_SCOPE} .guide-section-title`, "color"],
+  "sidebar.icon": [`${GUIDE_SCOPE} yt-icon, ${GUIDE_SCOPE} .guide-icon`, "color"],
+  "sidebar.selected": [`${GUIDE_SCOPE} :is([active], [aria-current="page"], .iron-selected)`, "backgroundColor"],
+  "sidebar.divider": [`${GUIDE_SCOPE} :is(ytd-guide-section-renderer, yt-guide-section-renderer, yt-guide-section)`, "borderBottomColor"],
+  createButton: [CREATE_BUTTON_SELECTOR, "backgroundColor"],
+  "createButton.text": [CREATE_BUTTON_SELECTOR, "color"],
+  logoText: ["#logo-icon svg path:not([fill])", "fill"],
+  notificationBell: [NOTIFICATION_BUTTON_SELECTOR, "backgroundColor"],
+  "notificationBell.icon": [NOTIFICATION_BUTTON_SELECTOR, "color"]
 };
 // Static declarations applied alongside a color, used where a color alone is
 // not enough (the masthead's frosted-glass layer must lose its blur).
@@ -545,6 +570,56 @@ function markAskButtons() {
   for (const node of masthead.querySelectorAll(NO_AI_CANDIDATE_SELECTOR)) {
     const target = askButtonTarget(node);
     if (target) target.classList.add(ASK_BUTTON_CLASS);
+  }
+}
+
+function createButtonTarget(node) {
+  if (!node) return null;
+  const label = [
+    node.getAttribute("aria-label") || "",
+    node.getAttribute("title") || "",
+    node.innerText || ""
+  ].join(" ").replace(/\s+/g, " ").trim();
+  if (!/^create(?:\s|$)/i.test(label)) return null;
+
+  return node.closest("button-view-model") ||
+    node.closest("button, a[role='button'], [role='button'], ytd-button-renderer, tp-yt-paper-button") ||
+    node;
+}
+
+// Tag the masthead Create entry point so its colors do not depend on
+// YouTube's renderer class names.
+function markCreateButtons() {
+  if (!isHomeFeed()) return;
+  const masthead = document.querySelector("ytd-masthead");
+  if (!masthead) return;
+  for (const node of masthead.querySelectorAll("button, a[role='button'], [role='button'], ytd-button-renderer, yt-button-shape, yt-button-view-model, tp-yt-paper-button")) {
+    const target = createButtonTarget(node);
+    if (target) target.classList.add(CREATE_BUTTON_CLASS);
+  }
+}
+
+function notificationButtonTarget(node) {
+  if (!node) return null;
+  const label = [
+    node.getAttribute("aria-label") || "",
+    node.getAttribute("title") || "",
+    node.innerText || ""
+  ].join(" ").replace(/\s+/g, " ").trim();
+  if (!/^notifications?(?:\s|$)/i.test(label)) return null;
+
+  return node.closest("button-view-model") ||
+    node.closest("button, a[role='button'], [role='button'], ytd-button-renderer, tp-yt-paper-button") ||
+    node;
+}
+
+function markNotificationButtons() {
+  if (!isHomeFeed()) return;
+  const masthead = document.querySelector("ytd-masthead");
+  if (!masthead) return;
+  for (const node of masthead.querySelectorAll("button, a[role='button'], [role='button'], ytd-button-renderer, yt-button-shape, yt-button-view-model, tp-yt-paper-button")) {
+    const target = notificationButtonTarget(node);
+    if (target) target.classList.add(NOTIFICATION_BUTTON_CLASS);
   }
 }
 
@@ -1406,6 +1481,8 @@ function scheduleItemSync() {
     purgeShorts();
     applyNoAI(noAISetting);
     markAskButtons();
+    markCreateButtons();
+    markNotificationButtons();
     applyHomeColors(currentHomeColors);
     applyHomeBackgroundImage(currentHomeBackgroundImage);
     scheduleHomeVideoHeight();
@@ -1454,6 +1531,8 @@ for (const eventName of ["yt-navigate-finish", "yt-page-data-updated", "popstate
     applyFontFamily(currentFontFamily);
     applyNoAI(noAISetting);
     markAskButtons();
+    markCreateButtons();
+    markNotificationButtons();
     applyHomeColors(currentHomeColors);
     applyHomeBackgroundImage(currentHomeBackgroundImage);
     scheduleHomeVideoHeight();

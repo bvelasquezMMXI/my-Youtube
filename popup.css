@@ -509,3 +509,59 @@ main {
 .color-reset[hidden] {
   display: none;
 }
+
+#theme-presets[hidden] {
+  display: none;
+}
+
+.preset-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.preset-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.preset-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.preset-swatches {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 2px;
+}
+
+.preset-swatch {
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--border);
+}
+
+.preset-apply {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 0;
+  background: var(--surface);
+  color: var(--fg);
+  font: 10px/1.2 Arial, Helvetica, sans-serif;
+  cursor: pointer;
+}
+
+.preset-apply:hover {
+  background: var(--hover);
+}
+
+.preset-apply:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}

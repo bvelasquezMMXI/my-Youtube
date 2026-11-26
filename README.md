@@ -32,10 +32,15 @@ hashtags** strips hashtags from video titles and descriptions on watch pages,
 cards, and Shorts, and hides hashtag links; turning it off restores the
 original text. **Remove recommended videos** hides the watch page's right
 column and expands the player, description, and comments to the full width.
+**Themes → Presets** offers **Midnight Black**, which fills every Home color
+slot at once: rich black page background (`#050507`), near-black blue
+surfaces/sidebar/cards, and white text (icons in pale blue).
 Under **Themes → Home**, a nested list of color fields covers the home page's
 search bar (surface and text), search button (surface and decal), Ask YouTube
 button (surface and text, hidden while that element is removed), microphone
-(surface and decal), filter bar (bar, options, and option text), and video
+(surface and decal), Create button (surface and text), the notification bell
+(surface and bell), the YouTube logo wordmark, filter bar (bar, options, and
+option text), and video
 cards (card, title, stats/channel line, length badge, and badge text), the page
 background (including the frosted band behind the search and filter bars), and
 the sidebar. The sidebar expands into text, section title, icon, selected item,
