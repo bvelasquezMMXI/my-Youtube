@@ -48,15 +48,35 @@ const HOME_COLOR_STYLE_ID = "ytc-home-colors";
 const HOME_IMAGE_STYLE_ID = "ytc-home-bg-image";
 const ASK_BUTTON_CLASS = "ytc-ask-button";
 const ASK_BUTTON_SELECTOR = ".ytc-ask-button, .ytc-ask-button button";
+const SEARCH_FIELD_SELECTOR = [
+  "yt-searchbox textarea.ytSearchboxComponentInput",
+  "yt-searchbox textarea.ytSearchboxComponentInputTextArea",
+  "yt-searchbox textarea.yt-searchbox-input",
+  "yt-searchbox textarea[name='search_query']",
+  "yt-searchbox textarea",
+  "yt-searchbox input.ytSearchboxComponentInput",
+  "yt-searchbox input[type='text']",
+  "ytd-searchbox input#search",
+  "#search-input input",
+  "input[name='search_query']"
+].join(", ");
+const SEARCH_BUTTON_SELECTOR = [
+  "yt-searchbox button.ytSearchboxComponentSearchButton",
+  "yt-searchbox button[aria-label='Search']",
+  "yt-searchbox button-view-model button[aria-label='Search']"
+].join(", ");
 const CHIP_OPTION_SCOPE = "ytd-feed-filter-chip-bar-renderer yt-chip-cloud-chip-renderer:not([selected]):not(.iron-selected)";
 const HOME_COLOR_RULES = {
   searchBar: [["yt-searchbox .ytSearchboxComponentInputBox", "background-color"]],
   "searchBar.text": [
-    ["yt-searchbox input.ytSearchboxComponentInput", "color"],
-    ["yt-searchbox input.ytSearchboxComponentInput::placeholder", "color"]
+    [SEARCH_FIELD_SELECTOR, "color"],
+    [SEARCH_FIELD_SELECTOR, "-webkit-text-fill-color"],
+    [SEARCH_FIELD_SELECTOR, "caret-color"],
+    [`:is(${SEARCH_FIELD_SELECTOR})::placeholder`, "color"],
+    [`:is(${SEARCH_FIELD_SELECTOR})::placeholder`, "-webkit-text-fill-color"]
   ],
-  searchButton: [["yt-searchbox button.ytSearchboxComponentSearchButton", "background-color"]],
-  "searchButton.decal": [["yt-searchbox button.ytSearchboxComponentSearchButton", "color"]],
+  searchButton: [[SEARCH_BUTTON_SELECTOR, "background-color"]],
+  "searchButton.decal": [[SEARCH_BUTTON_SELECTOR, "color"]],
   askButton: [[ASK_BUTTON_SELECTOR, "background-color"]],
   "askButton.text": [[ASK_BUTTON_SELECTOR, "color"]],
   micButton: [["#voice-search-button, #voice-search-button button", "background-color"]],
@@ -64,21 +84,25 @@ const HOME_COLOR_RULES = {
   filterBar: [["#chips-wrapper", "background-color"]],
   "filterBar.options": [[`${CHIP_OPTION_SCOPE} .ytChipShapeChip`, "background-color"]],
   "filterBar.options.text": [[`${CHIP_OPTION_SCOPE} .ytChipShapeText, ${CHIP_OPTION_SCOPE} .ytChipShapeChip`, "color"]],
-  video: [["ytd-rich-item-renderer :is(yt-lockup-view-model, ytd-video-renderer)", "background-color"]],
+  video: [["ytd-rich-item-renderer", "background-color"]],
   "video.title": [["ytd-rich-item-renderer .ytLockupMetadataViewModelTitle, ytd-rich-item-renderer #video-title", "color"]],
   "video.meta": [["ytd-rich-item-renderer .ytContentMetadataViewModelMetadataText, ytd-rich-item-renderer #metadata-line", "color"]],
   "video.length": [["ytd-rich-item-renderer .ytBadgeShapeThumbnailBadge", "background-color"]],
   "video.length.text": [["ytd-rich-item-renderer .ytBadgeShapeThumbnailBadge .ytBadgeShapeText", "color"]],
-  pageBackground: [["ytd-app", "background-color"], ["body", "background-color"]],
+  pageBackground: [
+    ["ytd-app", "background-color"],
+    ["body", "background-color"],
+    ["#frosted-glass", "background-color"]
+  ],
   sidebar: [
     ["ytd-guide-renderer, ytd-mini-guide-renderer, #guide-content, #guide-inner-content", "background-color"]
   ]
 };
 const HOME_COLOR_SAMPLE_RULES = {
   searchBar: ["yt-searchbox .ytSearchboxComponentInputBox", "backgroundColor"],
-  "searchBar.text": ["yt-searchbox input.ytSearchboxComponentInput", "color"],
-  searchButton: ["yt-searchbox button.ytSearchboxComponentSearchButton", "backgroundColor"],
-  "searchButton.decal": ["yt-searchbox button.ytSearchboxComponentSearchButton", "color"],
+  "searchBar.text": [SEARCH_FIELD_SELECTOR, "color"],
+  searchButton: [SEARCH_BUTTON_SELECTOR, "backgroundColor"],
+  "searchButton.decal": [SEARCH_BUTTON_SELECTOR, "color"],
   askButton: [ASK_BUTTON_SELECTOR, "backgroundColor"],
   "askButton.text": [ASK_BUTTON_SELECTOR, "color"],
   micButton: ["#voice-search-button", "backgroundColor"],
@@ -93,6 +117,14 @@ const HOME_COLOR_SAMPLE_RULES = {
   "video.length.text": ["ytd-rich-item-renderer .ytBadgeShapeThumbnailBadge .ytBadgeShapeText", "color"],
   pageBackground: ["ytd-app", "backgroundColor"],
   sidebar: ["ytd-guide-renderer, #guide-content, #guide-inner-content", "backgroundColor"]
+};
+// Static declarations applied alongside a color, used where a color alone is
+// not enough (the masthead's frosted-glass layer must lose its blur).
+const HOME_COLOR_STATIC_RULES = {
+  pageBackground: [
+    ["#frosted-glass", "backdrop-filter:none !important"],
+    ["#frosted-glass", "-webkit-backdrop-filter:none !important"]
+  ]
 };
 const SIDEBAR_KEY_ATTR = "data-ytc-sidebar-key";
 const SIDEBAR_DISABLED_CLASS = "ytc-sidebar-disabled";
@@ -276,6 +308,9 @@ function applyHomeColors(colors) {
     for (const [selector, declaration] of rules) {
       css += `html[data-ytc-home-colors] ${selector}{${declaration}:${color} !important}\n`;
     }
+    for (const [selector, declaration] of HOME_COLOR_STATIC_RULES[key] || []) {
+      css += `html[data-ytc-home-colors] ${selector}{${declaration}}\n`;
+    }
   }
 
   let style = document.getElementById(HOME_COLOR_STYLE_ID);
@@ -291,6 +326,35 @@ function applyHomeColors(colors) {
   }
   if (style.textContent !== css) style.textContent = css;
   root.dataset.ytcHomeColors = "1";
+}
+
+// Cards on the same flex line already share a height, but lines differ (ads
+// with call-to-action rows are taller). When the card color is set, measure
+// the natural heights and pin every card to the tallest so the filled
+// rectangles match without touching the text or media inside them.
+function syncHomeVideoHeight() {
+  const root = document.documentElement;
+  if (!isHomeFeed() || !normalizeHomeColor(currentHomeColors.video)) {
+    root.style.removeProperty("--ytc-video-card-height");
+    return;
+  }
+
+  root.style.removeProperty("--ytc-video-card-height");
+  let tallest = 0;
+  for (const item of document.querySelectorAll("ytd-rich-grid-renderer > #contents > ytd-rich-item-renderer")) {
+    const height = item.getBoundingClientRect().height;
+    if (height > tallest) tallest = height;
+  }
+  if (tallest > 0) root.style.setProperty("--ytc-video-card-height", `${Math.ceil(tallest)}px`);
+}
+
+let videoHeightTimer = 0;
+function scheduleHomeVideoHeight() {
+  if (videoHeightTimer) return;
+  videoHeightTimer = setTimeout(() => {
+    videoHeightTimer = 0;
+    syncHomeVideoHeight();
+  }, 150);
 }
 
 function applyHomeBackgroundImage(value) {
@@ -1240,6 +1304,7 @@ function applyVideosPerRow(value) {
   } catch (error) {
     // localStorage can be unavailable on restricted pages.
   }
+  scheduleHomeVideoHeight();
 }
 
 let syncTimer = 0;
@@ -1254,6 +1319,7 @@ function scheduleItemSync() {
     markAskButtons();
     applyHomeColors(currentHomeColors);
     applyHomeBackgroundImage(currentHomeBackgroundImage);
+    scheduleHomeVideoHeight();
     markNoRadiusElements();
     syncSidebar();
     syncDislikes();
@@ -1301,6 +1367,7 @@ for (const eventName of ["yt-navigate-finish", "yt-page-data-updated", "popstate
     markAskButtons();
     applyHomeColors(currentHomeColors);
     applyHomeBackgroundImage(currentHomeBackgroundImage);
+    scheduleHomeVideoHeight();
     syncSidebar();
     syncDislikes();
     applyRemoveHashtags(removeHashtagsEnabled);
@@ -1348,6 +1415,7 @@ document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") reloadSettings();
 });
 window.addEventListener("pageshow", reloadSettings);
+window.addEventListener("resize", scheduleHomeVideoHeight);
 
 // The popup pings this listener; a missed response means this content script
 // belongs to a dead extension context and the popup refreshes the tab.
@@ -1386,7 +1454,10 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (changes.uiRadius) applyUiRadius(changes.uiRadius.newValue);
   if (changes.hoverHighlights) applyHoverHighlights(changes.hoverHighlights.newValue);
   if (changes.fontFamily) applyFontFamily(changes.fontFamily.newValue);
-  if (changes.homeColors) applyHomeColors(changes.homeColors.newValue);
+  if (changes.homeColors) {
+    applyHomeColors(changes.homeColors.newValue);
+    scheduleHomeVideoHeight();
+  }
   if (changes.noAI) applyNoAI(changes.noAI.newValue);
   if (changes.removeHashtags) applyRemoveHashtags(changes.removeHashtags.newValue);
   if (changes.removeRecommended) applyRemoveRecommended(changes.removeRecommended.newValue);

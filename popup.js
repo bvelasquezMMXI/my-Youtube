@@ -95,6 +95,7 @@ const homeColorState = Object.create(null);
 let homeColorSamples = Object.create(null);
 let homeColorSamplesRequested = false;
 let homeBackgroundImage = "";
+let homeColorsDirty = false;
 
 function normalizeHexColor(value) {
   const text = typeof value === "string" ? value.trim() : "";
@@ -113,6 +114,7 @@ function homeColorValue(node) {
 }
 
 function saveHomeColors() {
+  homeColorsDirty = false;
   const colors = {};
   for (const [key, value] of Object.entries(homeColorState)) {
     const hex = normalizeHexColor(value);
@@ -120,6 +122,15 @@ function saveHomeColors() {
   }
   saveSync({ homeColors: colors });
 }
+
+function flushHomeColors() {
+  if (homeColorsDirty) saveHomeColors();
+}
+
+window.addEventListener("pagehide", flushHomeColors);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") flushHomeColors();
+});
 
 function renderHomeColors() {
   themeHomeTree.replaceChildren();
@@ -168,6 +179,7 @@ function renderHomeColors() {
 
     let saveTimer = 0;
     const queueSave = () => {
+      homeColorsDirty = true;
       clearTimeout(saveTimer);
       saveTimer = setTimeout(saveHomeColors, 700);
     };
