@@ -27,6 +27,12 @@
         <input class="option-number" id="ui-corner-radii-number" type="number" min="0" max="30" step="1" value="12">
         <input class="option-range" id="ui-corner-radii-range" type="range" min="0" max="30" step="1" value="12" aria-label="UI corner radii slider">
       </div>
+      <div class="option option-toggle" id="native-layout" hidden>
+        <label class="option-label" for="native-layout-checkbox">
+          <input class="option-check" id="native-layout-checkbox" type="checkbox">
+          <span>Use YouTube's native layout</span>
+        </label>
+      </div>
       <div class="option option-toggle" id="no-ai" hidden>
         <label class="option-label" for="no-ai-checkbox">
           <input class="option-check" id="no-ai-checkbox" type="checkbox">
@@ -68,7 +74,14 @@
         <div class="preset-toolbar">
           <button class="preset-button" id="preset-save" type="button">Save</button>
           <button class="preset-button" id="preset-load" type="button">Load</button>
-          <button class="preset-button" id="preset-export" type="button">Export</button>
+          <button class="preset-button preset-json-toggle" id="preset-json-toggle" type="button">JSON</button>
+        </div>
+        <div class="preset-json" id="preset-json-panel" hidden>
+          <textarea class="preset-json-text" id="preset-json-text" spellcheck="false" aria-label="Preset JSON"></textarea>
+          <div class="preset-json-actions">
+            <button class="preset-button" id="preset-json-save" type="button">Save JSON</button>
+            <span class="preset-status" id="preset-json-status" hidden></span>
+          </div>
         </div>
       </div>
       <div id="theme-home-colors" hidden>

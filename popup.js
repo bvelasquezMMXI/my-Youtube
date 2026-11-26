@@ -5,6 +5,8 @@ const panelEmpty = document.getElementById("panel-empty");
 const videosPerRow = document.getElementById("videos-per-row");
 const rowNumber = document.getElementById("videos-per-row-number");
 const rowRange = document.getElementById("videos-per-row-range");
+const nativeLayoutOption = document.getElementById("native-layout");
+const nativeLayoutCheckbox = document.getElementById("native-layout-checkbox");
 const cornerOption = document.getElementById("ui-corner-radii");
 const cornerNumber = document.getElementById("ui-corner-radii-number");
 const cornerRange = document.getElementById("ui-corner-radii-range");
@@ -29,8 +31,12 @@ const themePresetsPanel = document.getElementById("theme-presets");
 const presetList = document.getElementById("preset-list");
 const presetSaveButton = document.getElementById("preset-save");
 const presetLoadButton = document.getElementById("preset-load");
-const presetExportButton = document.getElementById("preset-export");
 const presetFile = document.getElementById("preset-file");
+const presetJsonToggle = document.getElementById("preset-json-toggle");
+const presetJsonPanel = document.getElementById("preset-json-panel");
+const presetJsonText = document.getElementById("preset-json-text");
+const presetJsonSave = document.getElementById("preset-json-save");
+const presetJsonStatus = document.getElementById("preset-json-status");
 const presetEmpty = document.getElementById("preset-empty");
 const presetStatus = document.getElementById("preset-status");
 const presetDialog = document.getElementById("preset-dialog");
@@ -143,13 +149,38 @@ const defaultThemePresets = [
   {
     id: "default",
     name: "Default",
-    settings: { videosPerRow: 4, uiRadius: 12, fontFamily: "" },
-    colors: {}
+    locked: true,
+    colors: {},
+    settings: {
+      nativeLayout: true,
+      videosPerRow: 4,
+      uiRadius: 12,
+      noAI: false,
+      hoverHighlights: true,
+      addDislikes: false,
+      removeHashtags: false,
+      removeRecommended: false,
+      fontFamily: ""
+    },
+    sidebarDisabled: [],
+    backgroundImage: ""
   },
   {
     id: "retro-youtube",
     name: "Retro YouTube",
-    settings: { videosPerRow: 3, uiRadius: 0, fontFamily: "Arial, sans-serif" },
+    settings: {
+      nativeLayout: false,
+      videosPerRow: 3,
+      uiRadius: 0,
+      noAI: false,
+      hoverHighlights: true,
+      addDislikes: true,
+      removeHashtags: false,
+      removeRecommended: false,
+      fontFamily: "Arial, sans-serif"
+    },
+    sidebarDisabled: [],
+    backgroundImage: "",
     colors: {
       pageBackground: "#ffffff",
       sidebar: "#f5f5f5",
@@ -192,6 +223,7 @@ let presetStore = defaultThemePresets.map((preset) => ({
   settings: preset.settings ? { ...preset.settings } : undefined,
   colors: { ...preset.colors }
 }));
+let appliedPresetId = null;
 
 const homeColorState = Object.create(null);
 let homeColorSamples = Object.create(null);
@@ -391,35 +423,81 @@ themeBgImageRemove.addEventListener("click", () => {
 
 renderHomeBackgroundImage();
 
+function updateLayoutControlsDisabled() {
+  const disabled = nativeLayoutCheckbox.checked;
+  rowNumber.disabled = disabled;
+  rowRange.disabled = disabled;
+  cornerNumber.disabled = disabled;
+  cornerRange.disabled = disabled;
+}
+
 function applyPreset(preset) {
+  const colors = preset.colors && typeof preset.colors === "object" ? preset.colors : {};
   for (const key of Object.keys(homeColorState)) delete homeColorState[key];
-  for (const [key, value] of Object.entries(preset.colors)) {
+  for (const [key, value] of Object.entries(colors)) {
     const hex = normalizeHexColor(value);
     if (hex) homeColorState[key] = hex;
   }
-  renderHomeColors();
-  saveHomeColors();
 
-  if (!preset.settings) return;
-  const updates = {};
-  if (Number.isFinite(preset.settings.videosPerRow)) {
-    const value = clampRowValue(preset.settings.videosPerRow);
+  const settings = preset.settings && typeof preset.settings === "object" ? preset.settings : {};
+  const updates = { homeColors: { ...homeColorState } };
+
+  if (typeof settings.nativeLayout === "boolean") {
+    nativeLayoutCheckbox.checked = settings.nativeLayout;
+    updates.nativeLayout = settings.nativeLayout;
+  }
+  if (Number.isFinite(settings.videosPerRow)) {
+    const value = clampRowValue(settings.videosPerRow);
     rowNumber.value = String(value);
     rowRange.value = String(value);
     updates.videosPerRow = value;
   }
-  if (Number.isFinite(preset.settings.uiRadius)) {
-    const value = clampCornerValue(preset.settings.uiRadius);
+  if (Number.isFinite(settings.uiRadius)) {
+    const value = clampCornerValue(settings.uiRadius);
     cornerNumber.value = String(value);
     cornerRange.value = String(value);
     updates.uiRadius = value;
   }
-  if (typeof preset.settings.fontFamily === "string") {
-    fontSelect.value = preset.settings.fontFamily;
+  if (typeof settings.fontFamily === "string") {
+    fontSelect.value = settings.fontFamily;
     if (fontSelect.selectedIndex === -1) fontSelect.value = "";
     updates.fontFamily = fontSelect.value;
   }
-  if (Object.keys(updates).length) saveSync(updates);
+
+  const toggles = [
+    ["noAI", noAICheckbox],
+    ["hoverHighlights", hoverCheckbox],
+    ["addDislikes", addDislikesCheckbox],
+    ["removeHashtags", removeHashtagsCheckbox],
+    ["removeRecommended", noRecommendedCheckbox]
+  ];
+  for (const [key, box] of toggles) {
+    if (typeof settings[key] === "boolean") {
+      box.checked = settings[key];
+      updates[key] = settings[key];
+    }
+  }
+
+  renderHomeColors();
+  homeColorsDirty = false;
+  updateLayoutControlsDisabled();
+  saveSync(updates);
+
+  if (Array.isArray(preset.sidebarDisabled)) {
+    sidebarDisabled = new Set(preset.sidebarDisabled.filter((key) => typeof key === "string"));
+    const keys = Array.from(sidebarDisabled);
+    renderSidebarTree();
+    pushSidebarState(keys);
+    localStore?.set({ sidebarDisabled: keys });
+  }
+  if (typeof preset.backgroundImage === "string") {
+    homeBackgroundImage = preset.backgroundImage.startsWith("data:image/") ? preset.backgroundImage : "";
+    renderHomeBackgroundImage();
+    localStore?.set({ homeBackgroundImage });
+  }
+
+  appliedPresetId = preset.id;
+  if (!presetJsonPanel.hidden) refreshPresetJson();
 }
 
 function makePresetId() {
@@ -502,20 +580,34 @@ function renderPresets() {
       }, 1200);
     });
 
-    const remove = document.createElement("button");
-    remove.type = "button";
-    remove.className = "preset-delete";
-    remove.textContent = "\u00d7";
-    remove.title = `Delete ${preset.name}`;
-    remove.setAttribute("aria-label", `Delete ${preset.name}`);
-    remove.addEventListener("click", () => {
-      presetStore = presetStore.filter((item) => item !== preset);
-      persistPresets();
-      renderPresets();
-      showPresetStatus(`Deleted ${preset.name}.`);
-    });
+    const exportButton = document.createElement("button");
+    exportButton.type = "button";
+    exportButton.className = "preset-export";
+    exportButton.textContent = "Export";
+    exportButton.title = `Export ${preset.name}`;
+    exportButton.setAttribute("aria-label", `Export ${preset.name}`);
+    exportButton.addEventListener("click", () => exportPreset(preset));
 
-    row.append(info, swatches, apply, remove);
+    row.append(info, swatches, apply, exportButton);
+
+    if (!preset.locked) {
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "preset-delete";
+      remove.textContent = "\u00d7";
+      remove.title = `Delete ${preset.name}`;
+      remove.setAttribute("aria-label", `Delete ${preset.name}`);
+      remove.addEventListener("click", () => {
+        presetStore = presetStore.filter((item) => item !== preset);
+        if (appliedPresetId === preset.id) appliedPresetId = null;
+        persistPresets();
+        renderPresets();
+        if (!presetJsonPanel.hidden) refreshPresetJson();
+        showPresetStatus(`Deleted ${preset.name}.`);
+      });
+      row.append(remove);
+    }
+
     presetList.append(row);
   }
 }
@@ -531,8 +623,16 @@ function currentPresetData() {
     settings: {
       videosPerRow: Number(rowRange.value),
       uiRadius: Number(cornerRange.value),
+      nativeLayout: nativeLayoutCheckbox.checked,
+      noAI: noAICheckbox.checked,
+      hoverHighlights: hoverCheckbox.checked,
+      addDislikes: addDislikesCheckbox.checked,
+      removeHashtags: removeHashtagsCheckbox.checked,
+      removeRecommended: noRecommendedCheckbox.checked,
       fontFamily: fontSelect.value || ""
-    }
+    },
+    sidebarDisabled: Array.from(sidebarDisabled),
+    backgroundImage: homeBackgroundImage
   };
 }
 
@@ -547,6 +647,7 @@ function openPresetDialog() {
   presetChoices.replaceChildren();
 
   for (const preset of presetStore) {
+    if (preset.locked) continue;
     const label = document.createElement("label");
     label.className = "preset-choice";
     const radio = document.createElement("input");
@@ -581,7 +682,7 @@ function closePresetDialog() {
 }
 
 function savePresetFromDialog() {
-  const { colors, settings } = currentPresetData();
+  const { colors, settings, sidebarDisabled: hiddenSidebar, backgroundImage } = currentPresetData();
   const selected = presetChoices.querySelector('input[name="preset-target"]:checked');
   const target = selected ? selected.value : "__new__";
 
@@ -592,18 +693,122 @@ function savePresetFromDialog() {
       presetDialogStatus.hidden = false;
       return;
     }
-    presetStore.push({ id: makePresetId(), name: name.slice(0, 40), settings, colors });
+    presetStore.push({
+      id: makePresetId(),
+      name: name.slice(0, 40),
+      settings,
+      colors,
+      sidebarDisabled: hiddenSidebar,
+      backgroundImage
+    });
   } else {
     const preset = presetStore.find((item) => item.id === target);
-    if (!preset) return;
+    if (!preset || preset.locked) return;
     preset.settings = settings;
     preset.colors = colors;
+    preset.sidebarDisabled = hiddenSidebar;
+    preset.backgroundImage = backgroundImage;
   }
 
   persistPresets();
   renderPresets();
   closePresetDialog();
   showPresetStatus(target === "__new__" ? "Preset saved." : "Preset overwritten.");
+}
+
+function appliedPreset() {
+  return appliedPresetId ? presetStore.find((preset) => preset.id === appliedPresetId) || null : null;
+}
+
+function sortedObject(object) {
+  return Object.fromEntries(Object.entries(object || {}).sort(([a], [b]) => a.localeCompare(b)));
+}
+
+function presetComparable(preset) {
+  const clean = sanitizePreset(preset);
+  if (!clean) return "";
+  return JSON.stringify({
+    settings: sortedObject(clean.settings),
+    colors: sortedObject(clean.colors),
+    sidebarDisabled: [...clean.sidebarDisabled].sort(),
+    backgroundImage: clean.backgroundImage
+  });
+}
+
+function detectAppliedPreset() {
+  const currentKey = presetComparable(currentPresetData());
+  appliedPresetId = null;
+  for (const preset of presetStore) {
+    if (presetComparable(preset) === currentKey) {
+      appliedPresetId = preset.id;
+      break;
+    }
+  }
+  if (!presetJsonPanel.hidden) refreshPresetJson();
+}
+
+function showPresetJsonStatus(message) {
+  presetJsonStatus.textContent = message;
+  presetJsonStatus.hidden = false;
+}
+
+function refreshPresetJson() {
+  const preset = appliedPreset();
+  const data = preset || { id: "", name: "Current settings", ...currentPresetData() };
+  presetJsonText.value = JSON.stringify(data, null, 2);
+  const locked = Boolean(preset && preset.locked);
+  presetJsonText.readOnly = locked;
+  presetJsonSave.disabled = locked;
+  if (locked) showPresetJsonStatus("Default preset is locked.");
+  else presetJsonStatus.hidden = true;
+}
+
+function savePresetJson() {
+  const preset = appliedPreset();
+  if (preset && preset.locked) {
+    showPresetJsonStatus("Default preset is locked.");
+    return;
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(presetJsonText.value);
+  } catch (error) {
+    showPresetJsonStatus("Invalid JSON.");
+    return;
+  }
+
+  const clean = sanitizePreset(parsed);
+  if (!clean) {
+    showPresetJsonStatus("Invalid preset JSON.");
+    return;
+  }
+
+  if (preset) {
+    preset.name = clean.name;
+    preset.settings = clean.settings;
+    preset.colors = clean.colors;
+    preset.sidebarDisabled = clean.sidebarDisabled;
+    preset.backgroundImage = clean.backgroundImage;
+  } else {
+    const created = {
+      id: makePresetId(),
+      name: clean.name,
+      settings: clean.settings,
+      colors: clean.colors,
+      sidebarDisabled: clean.sidebarDisabled,
+      backgroundImage: clean.backgroundImage
+    };
+    presetStore.push(created);
+    appliedPresetId = created.id;
+  }
+
+  persistPresets();
+  renderPresets();
+  const saved = appliedPreset();
+  if (saved) applyPreset(saved);
+  refreshPresetJson();
+  showPresetJsonStatus("Preset saved.");
 }
 
 function sanitizePreset(raw) {
@@ -627,21 +832,31 @@ function sanitizePreset(raw) {
     settings.uiRadius = clampCornerValue(Number(sourceSettings.uiRadius));
   }
   if (typeof sourceSettings.fontFamily === "string") settings.fontFamily = sourceSettings.fontFamily;
+  for (const key of ["nativeLayout", "noAI", "hoverHighlights", "addDislikes", "removeHashtags", "removeRecommended"]) {
+    if (typeof sourceSettings[key] === "boolean") settings[key] = sourceSettings[key];
+  }
 
   const name = typeof raw.name === "string" && raw.name.trim() ? raw.name.trim().slice(0, 40) : "Imported preset";
   const id = typeof raw.id === "string" && raw.id.trim() ? raw.id.trim() : makePresetId();
-  return { id, name, settings, colors };
+  const sidebarDisabled = Array.isArray(raw.sidebarDisabled)
+    ? raw.sidebarDisabled.filter((key) => typeof key === "string")
+    : [];
+  const backgroundImage = typeof raw.backgroundImage === "string" && raw.backgroundImage.startsWith("data:image/")
+    ? raw.backgroundImage
+    : "";
+  return { id, name, settings, colors, sidebarDisabled, backgroundImage, locked: false };
 }
 
-function exportPresets() {
-  const blob = new Blob([JSON.stringify({ version: 1, presets: presetStore }, null, 2)], { type: "application/json" });
+function exportPreset(preset) {
+  const blob = new Blob([JSON.stringify({ version: 1, presets: [preset] }, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = "youtube-customizer-presets.json";
+  const slug = preset.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  link.download = `${slug || "preset"}.json`;
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
-  showPresetStatus(`Exported ${presetStore.length} preset${presetStore.length === 1 ? "" : "s"}.`);
+  showPresetStatus(`Exported ${preset.name}.`);
 }
 
 function importPresetFile() {
@@ -669,14 +884,17 @@ function importPresetFile() {
       showPresetStatus("No presets found.");
       return;
     }
+    let applied = 0;
     for (const preset of clean) {
+      if (preset.id === "default") continue;
       const index = presetStore.findIndex((item) => item.id === preset.id);
       if (index === -1) presetStore.push(preset);
       else presetStore[index] = preset;
+      applied += 1;
     }
     persistPresets();
     renderPresets();
-    showPresetStatus(`Loaded ${clean.length} preset${clean.length === 1 ? "" : "s"}.`);
+    showPresetStatus(`Loaded ${applied} preset${applied === 1 ? "" : "s"}.`);
   };
   reader.readAsText(file);
 }
@@ -689,7 +907,18 @@ presetDialog.addEventListener("click", (event) => {
 presetDialogSave.addEventListener("click", savePresetFromDialog);
 presetLoadButton.addEventListener("click", () => presetFile.click());
 presetFile.addEventListener("change", importPresetFile);
-presetExportButton.addEventListener("click", exportPresets);
+
+presetJsonToggle.addEventListener("click", () => {
+  if (presetJsonPanel.hidden) {
+    refreshPresetJson();
+    presetJsonPanel.hidden = false;
+    presetJsonToggle.textContent = "Hide JSON";
+  } else {
+    presetJsonPanel.hidden = true;
+    presetJsonToggle.textContent = "JSON";
+  }
+});
+presetJsonSave.addEventListener("click", savePresetJson);
 
 function requestHomeColorSamples() {
   if (homeColorSamplesRequested) return;
@@ -914,6 +1143,8 @@ function applySettings(settings) {
   const radius = clampCornerValue(settings.uiRadius);
   cornerNumber.value = String(radius);
   cornerRange.value = String(radius);
+  nativeLayoutCheckbox.checked = Boolean(settings.nativeLayout);
+  updateLayoutControlsDisabled();
   noAICheckbox.checked = Boolean(settings.noAI);
   hoverCheckbox.checked = settings.hoverHighlights !== false;
   addDislikesCheckbox.checked = settings.addDislikes !== false;
@@ -928,11 +1159,13 @@ function applySettings(settings) {
     if (hex) homeColorState[key] = hex;
   }
   renderHomeColors();
+  detectAppliedPreset();
 }
 
 const settingsDefaults = {
   videosPerRow: Number(rowRange.value),
   uiRadius: Number(cornerRange.value),
+  nativeLayout: false,
   noAI: false,
   hoverHighlights: true,
   addDislikes: true,
@@ -952,17 +1185,25 @@ if (localStore?.get) {
     homeBackgroundImage = typeof local.homeBackgroundImage === "string" ? local.homeBackgroundImage : "";
     if (Array.isArray(local.presets)) {
       presetStore = local.presets.map(sanitizePreset).filter(Boolean);
-      if ((local.presetsVersion || 0) < 2) {
-        presetStore = presetStore.filter((preset) => preset.id !== "midnight-black");
-        if (!presetStore.some((preset) => preset.id === "default")) presetStore.unshift(defaultThemePresets[0]);
-        localStore.set({ presets: presetStore, presetsVersion: 2 });
+      if ((local.presetsVersion || 0) < 3) {
+        presetStore = presetStore.filter((preset) => preset.id !== "midnight-black" && preset.id !== "default");
+        const canonical = defaultThemePresets[0];
+        presetStore.unshift({
+          ...canonical,
+          settings: { ...canonical.settings },
+          colors: {},
+          sidebarDisabled: [],
+          backgroundImage: ""
+        });
+        localStore.set({ presets: presetStore, presetsVersion: 3 });
       }
     } else {
-      localStore.set({ presets: presetStore, presetsVersion: 2 });
+      localStore.set({ presets: presetStore, presetsVersion: 3 });
     }
     renderSidebarTree();
     renderHomeBackgroundImage();
     renderPresets();
+    detectAppliedPreset();
   });
 }
 
@@ -1044,6 +1285,11 @@ fontFile.addEventListener("change", () => {
     });
   };
   reader.readAsDataURL(file);
+});
+
+nativeLayoutCheckbox.addEventListener("change", () => {
+  updateLayoutControlsDisabled();
+  saveSync({ nativeLayout: nativeLayoutCheckbox.checked });
 });
 
 noAICheckbox.addEventListener("change", () => {
@@ -1132,6 +1378,7 @@ function selectSubtab(tab) {
   const hasThemePresets = onThemes && tab.dataset.label === "Presets";
   videosPerRow.hidden = !hasMainOptions;
   cornerOption.hidden = !hasMainOptions;
+  nativeLayoutOption.hidden = !hasMainOptions;
   noAIOption.hidden = !hasMainOptions;
   hoverOption.hidden = !hasMainOptions;
   fontOption.hidden = !hasMainOptions;

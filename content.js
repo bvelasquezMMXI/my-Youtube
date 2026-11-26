@@ -193,6 +193,8 @@ const GUIDE_FETCH_BACKOFF = 60 * 1000;
 
 let currentVideosPerRow = DEFAULT_VIDEOS_PER_ROW;
 let currentUiRadius = DEFAULT_UI_RADIUS;
+let nativeLayoutEnabled = false;
+let layoutSettingsReady = false;
 let currentHomeColors = {};
 let currentHomeBackgroundImage = "";
 let currentHoverHighlights = true;
@@ -289,12 +291,36 @@ function applyUiRadius(value) {
   const root = document.documentElement;
 
   currentUiRadius = radius;
+  if (nativeLayoutEnabled) {
+    root.style.removeProperty("--ytc-ui-radius");
+    delete root.dataset.ytcUiRadius;
+    return;
+  }
   markNoRadiusElements();
   root.style.setProperty("--ytc-ui-radius", `${radius}px`);
   if (isHomeFeed() || location.pathname === "/watch" || location.pathname.startsWith("/live/")) {
     root.dataset.ytcUiRadius = String(radius);
   } else {
     delete root.dataset.ytcUiRadius;
+  }
+}
+
+function applyNativeLayout(value) {
+  nativeLayoutEnabled = Boolean(value);
+  if (!nativeLayoutEnabled) {
+    applyVideosPerRow(currentVideosPerRow);
+    applyUiRadius(currentUiRadius);
+    return;
+  }
+  const root = document.documentElement;
+  delete root.dataset.ytcVideosPerRow;
+  root.style.removeProperty("--ytc-videos-per-row");
+  delete root.dataset.ytcUiRadius;
+  root.style.removeProperty("--ytc-ui-radius");
+  try {
+    localStorage.removeItem(CACHE_KEY);
+  } catch (error) {
+    // localStorage can be unavailable on restricted pages.
   }
 }
 
@@ -1465,6 +1491,16 @@ function applyVideosPerRow(value) {
   const root = document.documentElement;
 
   currentVideosPerRow = count;
+  if (nativeLayoutEnabled) {
+    delete root.dataset.ytcVideosPerRow;
+    root.style.removeProperty("--ytc-videos-per-row");
+    try {
+      localStorage.removeItem(CACHE_KEY);
+    } catch (error) {
+      // localStorage can be unavailable on restricted pages.
+    }
+    return;
+  }
   root.dataset.ytcVideosPerRow = String(count);
   root.style.setProperty("--ytc-videos-per-row", String(count));
   syncItemAttributes(count);
@@ -1483,9 +1519,11 @@ function scheduleItemSync() {
   if (syncTimer) return;
   syncTimer = setTimeout(() => {
     syncTimer = 0;
-    syncItemAttributes(currentVideosPerRow);
-    skipBrokenIntro();
-    purgeShorts();
+    if (layoutSettingsReady && !nativeLayoutEnabled) {
+      syncItemAttributes(currentVideosPerRow);
+      skipBrokenIntro();
+      purgeShorts();
+    }
     applyNoAI(noAISetting);
     markAskButtons();
     markCreateButtons();
@@ -1502,7 +1540,7 @@ function scheduleItemSync() {
 
 if (document.documentElement) {
   new MutationObserver(() => {
-    skipBrokenIntro();
+    if (layoutSettingsReady && !nativeLayoutEnabled) skipBrokenIntro();
     scheduleItemSync();
   }).observe(document.documentElement, {
     childList: true,
@@ -1514,15 +1552,9 @@ for (const delay of [500, 1500, 4000]) {
   setTimeout(scheduleItemSync, delay);
 }
 
-let cachedVideosPerRow = NaN;
-try {
-  cachedVideosPerRow = Number(localStorage.getItem(CACHE_KEY));
-} catch (error) {
-  // Ignore and fall back to the storage read below.
-}
-if (Number.isFinite(cachedVideosPerRow) && cachedVideosPerRow >= 1 && cachedVideosPerRow <= 8) {
-  applyVideosPerRow(cachedVideosPerRow);
-}
+// Grid changes wait for the stored settings: applying the cached row count
+// before knowing nativeLayout would skip intro rows or purge Shorts on a page
+// that is meant to stay untouched.
 
 for (const eventName of ["focusin", "focusout"]) {
   document.addEventListener(eventName, () => {
@@ -1561,6 +1593,7 @@ function loadLocalSettings() {
 }
 
 function applySyncSettings(settings) {
+  applyNativeLayout(settings.nativeLayout);
   applyVideosPerRow(settings.videosPerRow);
   applyUiRadius(settings.uiRadius);
   applyHoverHighlights(settings.hoverHighlights);
@@ -1570,10 +1603,11 @@ function applySyncSettings(settings) {
   applyAddDislikes(settings.addDislikes !== false);
   applyRemoveHashtags(settings.removeHashtags);
   applyRemoveRecommended(settings.removeRecommended);
+  layoutSettingsReady = true;
 }
 
 function loadSyncSettings() {
-  globalThis.chrome?.storage?.sync?.get({ videosPerRow: DEFAULT_VIDEOS_PER_ROW, uiRadius: DEFAULT_UI_RADIUS, noAI: false, hoverHighlights: true, addDislikes: true, fontFamily: "", removeHashtags: false, removeRecommended: false, homeColors: {} }, applySyncSettings);
+  globalThis.chrome?.storage?.sync?.get({ videosPerRow: DEFAULT_VIDEOS_PER_ROW, uiRadius: DEFAULT_UI_RADIUS, noAI: false, hoverHighlights: true, addDislikes: true, fontFamily: "", removeHashtags: false, removeRecommended: false, nativeLayout: false, homeColors: {} }, applySyncSettings);
 }
 
 loadLocalSettings();
@@ -1625,6 +1659,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
     return;
   }
   if (area !== "sync") return;
+  if (changes.nativeLayout) applyNativeLayout(changes.nativeLayout.newValue);
   if (changes.videosPerRow) applyVideosPerRow(changes.videosPerRow.newValue);
   if (changes.uiRadius) applyUiRadius(changes.uiRadius.newValue);
   if (changes.hoverHighlights) applyHoverHighlights(changes.hoverHighlights.newValue);
@@ -1637,4 +1672,6 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (changes.removeHashtags) applyRemoveHashtags(changes.removeHashtags.newValue);
   if (changes.removeRecommended) applyRemoveRecommended(changes.removeRecommended.newValue);
   if (changes.addDislikes) applyAddDislikes(changes.addDislikes.newValue);
+  // Grid hiding/skipping cannot be undone in place, so re-fetch the native page.
+  if (changes.nativeLayout && isHomeFeed()) location.reload();
 });

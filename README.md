@@ -32,16 +32,24 @@ hashtags** strips hashtags from video titles and descriptions on watch pages,
 cards, and Shorts, and hides hashtag links; turning it off restores the
 original text. **Remove recommended videos** hides the watch page's right
 column and expands the player, description, and comments to the full width.
-**Themes → Presets** contains **Default**, which removes every color override
-and restores the extension's base look (4 videos per row, 12 px radii, original
-font — i.e. YouTube's own CSS), and **Retro YouTube**, which recreates the
-early YouTube site: white and light-gray chrome, blue video titles, a brick-red
-wordmark, Arial, 3 videos per row, and 0 px corners. Presets can carry layout
-settings — videos per row, UI corner radii, and font — which apply together
-with the colors. **Save** opens a dialog to overwrite an existing preset or
-store the current settings as a new one; each row has a delete button.
-**Export** downloads all presets as JSON and **Load** imports that file back
-(merging presets by id). Saved presets live in `chrome.storage.local`.
+**Themes → Presets** contains the locked **Default** preset, which removes
+every override and turns on YouTube's untouched layout (no colors, radii, row
+count, fonts, sidebar hiding, background image, or injected features), and
+**Retro YouTube**, which recreates the early YouTube site: white and light-gray
+chrome, blue video titles, a brick-red wordmark, Arial, 3 videos per row, and
+0 px corners. Presets capture every setting the extension exposes — colors,
+native layout, videos per row, radii, font, Ask/hover/dislikes/hashtags/
+recommended toggles — plus hidden sidebar entries and the background image.
+**Save** opens a dialog to overwrite an existing preset or store the current
+state as a new one. Every row has Apply, Export (that single preset as JSON),
+and — except for Default — delete. **Load** imports an exported JSON file,
+merging by id. Saved presets live in `chrome.storage.local`; Default cannot be
+deleted, overwritten, or replaced by an import. The **Use YouTube's native
+layout** toggle on Home → Main disables the row and radius overrides by hand.
+The **JSON** button at the bottom right of Presets expands an editor that shows
+the applied preset (or the current settings if none matches); editing the JSON
+and pressing **Save JSON** writes the changes back to that preset and reapplies
+it. The locked Default preset is read-only there.
 Under **Themes → Home**, a nested list of color fields covers the home page's
 search bar (surface and text), search button (surface and decal), Ask YouTube
 button (surface and text, hidden while that element is removed), microphone
