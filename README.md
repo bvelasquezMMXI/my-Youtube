@@ -40,14 +40,17 @@ cards (card, title, stats/channel line, length badge, and badge text), the page
 background (including the frosted band behind the search and filter bars), and
 the sidebar. Every row has a color rectangle plus an editable
 hex field; both start at the color YouTube currently uses, update the page
-while they are edited, and the ↺ button restores the native color. Above the
+while they are edited, and the ↺ button restores the native color. The search
+placeholder is derived automatically, 15% darker than the chosen search text
+color. Above the
 bottom **Reset all colors** button, a background image picker replaces the page
 background color with a stored picture (with Remove to delete it). **Reset all
 colors** clears every color override at once. Picks persist in
 `chrome.storage.sync` as `homeColors`; the background image lives in
 `chrome.storage.local` as `homeBackgroundImage`. When the Video color is set,
-every home card is pinned to the tallest card's height so the filled rectangles
-line up; text, thumbnails, and controls keep their natural sizes.
+every home card is pinned to the tallest card's height minus 30 px so the
+filled rectangles line up; text, thumbnails, and controls keep their natural
+sizes.
 
 ## Structure
 

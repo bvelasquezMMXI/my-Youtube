@@ -72,8 +72,8 @@ const HOME_COLOR_RULES = {
     [SEARCH_FIELD_SELECTOR, "color"],
     [SEARCH_FIELD_SELECTOR, "-webkit-text-fill-color"],
     [SEARCH_FIELD_SELECTOR, "caret-color"],
-    [`:is(${SEARCH_FIELD_SELECTOR})::placeholder`, "color"],
-    [`:is(${SEARCH_FIELD_SELECTOR})::placeholder`, "-webkit-text-fill-color"]
+    [`:is(${SEARCH_FIELD_SELECTOR})::placeholder`, "color", "darker"],
+    [`:is(${SEARCH_FIELD_SELECTOR})::placeholder`, "-webkit-text-fill-color", "darker"]
   ],
   searchButton: [[SEARCH_BUTTON_SELECTOR, "background-color"]],
   "searchButton.decal": [[SEARCH_BUTTON_SELECTOR, "color"]],
@@ -260,6 +260,17 @@ function rgbToHex({ r, g, b }) {
     .join("")}`;
 }
 
+function darkenHexColor(hex, amount) {
+  const value = normalizeHomeColor(hex);
+  if (!value) return hex;
+  const factor = 1 - (Number.isFinite(amount) ? amount : 0.15);
+  return rgbToHex({
+    r: parseInt(value.slice(1, 3), 16) * factor,
+    g: parseInt(value.slice(3, 5), 16) * factor,
+    b: parseInt(value.slice(5, 7), 16) * factor
+  });
+}
+
 function hexToRgb(hex) {
   return {
     r: parseInt(hex.slice(1, 3), 16),
@@ -305,8 +316,9 @@ function applyHomeColors(colors) {
     const color = normalizeHomeColor(value);
     const rules = HOME_COLOR_RULES[key];
     if (!color || !rules) continue;
-    for (const [selector, declaration] of rules) {
-      css += `html[data-ytc-home-colors] ${selector}{${declaration}:${color} !important}\n`;
+    for (const [selector, declaration, variant] of rules) {
+      const value = variant === "darker" ? darkenHexColor(color) : color;
+      css += `html[data-ytc-home-colors] ${selector}{${declaration}:${value} !important}\n`;
     }
     for (const [selector, declaration] of HOME_COLOR_STATIC_RULES[key] || []) {
       css += `html[data-ytc-home-colors] ${selector}{${declaration}}\n`;
@@ -332,20 +344,49 @@ function applyHomeColors(colors) {
 // with call-to-action rows are taller). When the card color is set, measure
 // the natural heights and pin every card to the tallest so the filled
 // rectangles match without touching the text or media inside them.
+const observedVideoItems = new WeakSet();
+let videoHeightObserver = null;
+if (typeof ResizeObserver === "function") {
+  videoHeightObserver = new ResizeObserver((entries) => {
+    // Only react when a card outgrows the current pin; our own pin/unpin
+    // during measuring therefore never re-triggers the pass.
+    const pinned = Number.parseFloat(document.documentElement.style.getPropertyValue("--ytc-video-card-height")) || 0;
+    for (const entry of entries) {
+      if (entry.contentRect.height > pinned + 1) {
+        scheduleHomeVideoHeight();
+        return;
+      }
+    }
+  });
+}
+
+const VIDEO_HEIGHT_TRIM = 30;
+
 function syncHomeVideoHeight() {
   const root = document.documentElement;
   if (!isHomeFeed() || !normalizeHomeColor(currentHomeColors.video)) {
     root.style.removeProperty("--ytc-video-card-height");
+    delete root.dataset.ytcVideoHeight;
     return;
   }
 
+  delete root.dataset.ytcVideoHeight;
   root.style.removeProperty("--ytc-video-card-height");
   let tallest = 0;
-  for (const item of document.querySelectorAll("ytd-rich-grid-renderer > #contents > ytd-rich-item-renderer")) {
+  const items = document.querySelectorAll("ytd-rich-grid-renderer ytd-rich-item-renderer");
+  for (const item of items) {
     const height = item.getBoundingClientRect().height;
     if (height > tallest) tallest = height;
+    if (!observedVideoItems.has(item)) {
+      observedVideoItems.add(item);
+      videoHeightObserver?.observe(item);
+    }
   }
-  if (tallest > 0) root.style.setProperty("--ytc-video-card-height", `${Math.ceil(tallest)}px`);
+  if (tallest > 0) {
+    const height = Math.max(1, Math.ceil(tallest) - VIDEO_HEIGHT_TRIM);
+    root.style.setProperty("--ytc-video-card-height", `${height}px`);
+    root.dataset.ytcVideoHeight = "1";
+  }
 }
 
 let videoHeightTimer = 0;

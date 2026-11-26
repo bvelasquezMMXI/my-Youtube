@@ -150,10 +150,11 @@ html[data-ytc-ui-radius] .ytSpecAvatarShapeLiveRing::after {
   border-radius: calc(var(--ytc-ui-radius) + 6px) !important;
 }
 
-/* With a custom card color, pin every home card to the tallest card so the
-   filled rectangles line up; text and media keep their natural size. */
-html[data-ytc-home-colors] ytd-rich-grid-renderer > #contents > ytd-rich-item-renderer {
-  min-height: var(--ytc-video-card-height, 0px);
+/* With a custom card color, pin every home card to the tallest card minus a
+   small trim so the filled rectangles line up; text and media keep their
+   natural size. */
+html[data-ytc-video-height] ytd-rich-grid-renderer ytd-rich-item-renderer {
+  height: var(--ytc-video-card-height) !important;
 }
 
 html[data-ytc-videos-per-row] #home-container-media > .rich-grid-media-skeleton {
