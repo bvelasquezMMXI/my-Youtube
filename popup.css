@@ -528,10 +528,22 @@ main {
   font-weight: 700;
 }
 
-.preset-name {
+.preset-info {
   flex: 1 1 auto;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.preset-name {
   overflow-wrap: anywhere;
+}
+
+.preset-meta {
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 400;
 }
 
 .preset-swatches {

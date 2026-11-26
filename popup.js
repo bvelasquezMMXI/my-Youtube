@@ -73,6 +73,12 @@ const homeColorSpec = [
     fallback: "#f2f2f2",
     children: [{ key: "notificationBell.icon", label: "Bell color", fallback: "#0f0f0f" }]
   },
+  {
+    key: "sidebarExpander",
+    label: "Sidebar expander",
+    fallback: "#ffffff",
+    children: [{ key: "sidebarExpander.icon", label: "Icon color", fallback: "#0f0f0f" }]
+  },
   { key: "logoText", label: "YouTube logo text", fallback: "#0f0f0f" },
   {
     key: "filterBar",
@@ -146,6 +152,8 @@ const themePresets = [
       logoText: "#ffffff",
       notificationBell: "#101c3a",
       "notificationBell.icon": "#ffffff",
+      sidebarExpander: "#050507",
+      "sidebarExpander.icon": "#ffffff",
       filterBar: "#080d19",
       "filterBar.options": "#0d1730",
       "filterBar.options.text": "#ffffff",
@@ -155,6 +163,45 @@ const themePresets = [
       "video.title": "#ffffff",
       "video.meta": "#aebbd6",
       "video.length": "#0b1428",
+      "video.length.text": "#ffffff"
+    }
+  },
+  {
+    id: "retro-youtube",
+    name: "Retro YouTube",
+    settings: { videosPerRow: 3, uiRadius: 0, fontFamily: "Arial, sans-serif" },
+    colors: {
+      pageBackground: "#ffffff",
+      sidebar: "#f5f5f5",
+      "sidebar.text": "#333333",
+      "sidebar.sectionTitle": "#666666",
+      "sidebar.icon": "#666666",
+      "sidebar.selected": "#e8e8e8",
+      "sidebar.divider": "#cccccc",
+      searchBar: "#ffffff",
+      "searchBar.text": "#000000",
+      searchButton: "#f0f0f0",
+      "searchButton.decal": "#333333",
+      askButton: "#f0f0f0",
+      "askButton.text": "#333333",
+      micButton: "#f0f0f0",
+      "micButton.decal": "#333333",
+      createButton: "#e5e5e5",
+      "createButton.text": "#333333",
+      notificationBell: "#f0f0f0",
+      "notificationBell.icon": "#333333",
+      sidebarExpander: "#ffffff",
+      "sidebarExpander.icon": "#333333",
+      logoText: "#cc0000",
+      filterBar: "#ebebeb",
+      "filterBar.options": "#f5f5f5",
+      "filterBar.options.text": "#333333",
+      "filterBar.options.selected": "#0000cc",
+      "filterBar.options.selectedText": "#ffffff",
+      video: "#ffffff",
+      "video.title": "#0000cc",
+      "video.meta": "#666666",
+      "video.length": "#000000",
       "video.length.text": "#ffffff"
     }
   }
@@ -366,6 +413,27 @@ function applyPreset(preset) {
   }
   renderHomeColors();
   saveHomeColors();
+
+  if (!preset.settings) return;
+  const updates = {};
+  if (Number.isFinite(preset.settings.videosPerRow)) {
+    const value = clampRowValue(preset.settings.videosPerRow);
+    rowNumber.value = String(value);
+    rowRange.value = String(value);
+    updates.videosPerRow = value;
+  }
+  if (Number.isFinite(preset.settings.uiRadius)) {
+    const value = clampCornerValue(preset.settings.uiRadius);
+    cornerNumber.value = String(value);
+    cornerRange.value = String(value);
+    updates.uiRadius = value;
+  }
+  if (typeof preset.settings.fontFamily === "string") {
+    fontSelect.value = preset.settings.fontFamily;
+    if (fontSelect.selectedIndex === -1) fontSelect.value = "";
+    updates.fontFamily = fontSelect.value;
+  }
+  if (Object.keys(updates).length) saveSync(updates);
 }
 
 function renderPresets() {
@@ -375,9 +443,27 @@ function renderPresets() {
     const row = document.createElement("div");
     row.className = "preset-row";
 
+    const info = document.createElement("span");
+    info.className = "preset-info";
+
     const name = document.createElement("span");
     name.className = "preset-name";
     name.textContent = preset.name;
+    info.append(name);
+
+    if (preset.settings) {
+      const meta = document.createElement("span");
+      meta.className = "preset-meta";
+      const parts = [];
+      if (Number.isFinite(preset.settings.videosPerRow)) parts.push(`${preset.settings.videosPerRow} per row`);
+      if (Number.isFinite(preset.settings.uiRadius)) parts.push(`${preset.settings.uiRadius} px radii`);
+      if (typeof preset.settings.fontFamily === "string" && preset.settings.fontFamily) {
+        const option = Array.from(fontSelect.options).find((item) => item.value === preset.settings.fontFamily);
+        parts.push(option ? option.textContent : "Custom font");
+      }
+      meta.textContent = parts.join(" \u00b7 ");
+      info.append(meta);
+    }
 
     const swatches = document.createElement("span");
     swatches.className = "preset-swatches";
@@ -400,7 +486,7 @@ function renderPresets() {
       }, 1200);
     });
 
-    row.append(name, swatches, apply);
+    row.append(info, swatches, apply);
     presetList.append(row);
   }
 }

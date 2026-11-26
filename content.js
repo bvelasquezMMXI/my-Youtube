@@ -131,6 +131,11 @@ const HOME_COLOR_RULES = {
   "notificationBell.icon": [
     [NOTIFICATION_BUTTON_SELECTOR, "color"],
     [".ytc-notification-bell yt-icon, .ytc-notification-bell svg", "fill"]
+  ],
+  sidebarExpander: [["ytd-masthead #guide-button, ytd-masthead #guide-button button", "background-color"]],
+  "sidebarExpander.icon": [
+    ["ytd-masthead #guide-button, ytd-masthead #guide-button button", "color"],
+    ["ytd-masthead #guide-button yt-icon, ytd-masthead #guide-button svg", "fill"]
   ]
 };
 const HOME_COLOR_SAMPLE_RULES = {
@@ -163,7 +168,9 @@ const HOME_COLOR_SAMPLE_RULES = {
   "createButton.text": [CREATE_BUTTON_SELECTOR, "color"],
   logoText: ["#logo-icon svg path:not([fill])", "fill"],
   notificationBell: [NOTIFICATION_BUTTON_SELECTOR, "backgroundColor"],
-  "notificationBell.icon": [NOTIFICATION_BUTTON_SELECTOR, "color"]
+  "notificationBell.icon": [NOTIFICATION_BUTTON_SELECTOR, "color"],
+  sidebarExpander: ["ytd-masthead #guide-button", "backgroundColor"],
+  "sidebarExpander.icon": ["ytd-masthead #guide-button yt-icon", "color"]
 };
 // Static declarations applied alongside a color, used where a color alone is
 // not enough (the masthead's frosted-glass layer must lose its blur).
