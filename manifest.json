@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "YouTube Customizer",
-  "version": "1.1.0",
+  "version": "1.0",
   "description": "Customizes YouTube's layout, sidebar, player, and typography.",
   "permissions": ["storage", "scripting", "unlimitedStorage"],
   "host_permissions": [

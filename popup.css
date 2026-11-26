@@ -727,11 +727,6 @@ main {
   outline-offset: -2px;
 }
 
-.option-number:disabled,
-.option-range:disabled {
-  opacity: 0.45;
-}
-
 .preset-json-toggle {
   margin-left: auto;
 }
@@ -767,4 +762,10 @@ main {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+.preset-json-toggle {
+  min-width: 20px;
+  padding: 2px 4px;
+  text-align: center;
 }

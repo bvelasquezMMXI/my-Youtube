@@ -170,7 +170,7 @@ const defaultThemePresets = [
     name: "Retro YouTube",
     settings: {
       nativeLayout: false,
-      videosPerRow: 3,
+      videosPerRow: 6,
       uiRadius: 0,
       noAI: false,
       hoverHighlights: true,
@@ -423,12 +423,10 @@ themeBgImageRemove.addEventListener("click", () => {
 
 renderHomeBackgroundImage();
 
-function updateLayoutControlsDisabled() {
-  const disabled = nativeLayoutCheckbox.checked;
-  rowNumber.disabled = disabled;
-  rowRange.disabled = disabled;
-  cornerNumber.disabled = disabled;
-  cornerRange.disabled = disabled;
+function releaseNativeLayout(update) {
+  if (!nativeLayoutCheckbox.checked) return;
+  nativeLayoutCheckbox.checked = false;
+  update.nativeLayout = false;
 }
 
 function applyPreset(preset) {
@@ -442,10 +440,9 @@ function applyPreset(preset) {
   const settings = preset.settings && typeof preset.settings === "object" ? preset.settings : {};
   const updates = { homeColors: { ...homeColorState } };
 
-  if (typeof settings.nativeLayout === "boolean") {
-    nativeLayoutCheckbox.checked = settings.nativeLayout;
-    updates.nativeLayout = settings.nativeLayout;
-  }
+  const native = typeof settings.nativeLayout === "boolean" ? settings.nativeLayout : false;
+  nativeLayoutCheckbox.checked = native;
+  updates.nativeLayout = native;
   if (Number.isFinite(settings.videosPerRow)) {
     const value = clampRowValue(settings.videosPerRow);
     rowNumber.value = String(value);
@@ -480,7 +477,6 @@ function applyPreset(preset) {
 
   renderHomeColors();
   homeColorsDirty = false;
-  updateLayoutControlsDisabled();
   saveSync(updates);
 
   if (Array.isArray(preset.sidebarDisabled)) {
@@ -835,6 +831,7 @@ function sanitizePreset(raw) {
   for (const key of ["nativeLayout", "noAI", "hoverHighlights", "addDislikes", "removeHashtags", "removeRecommended"]) {
     if (typeof sourceSettings[key] === "boolean") settings[key] = sourceSettings[key];
   }
+  if (typeof settings.nativeLayout !== "boolean") settings.nativeLayout = false;
 
   const name = typeof raw.name === "string" && raw.name.trim() ? raw.name.trim().slice(0, 40) : "Imported preset";
   const id = typeof raw.id === "string" && raw.id.trim() ? raw.id.trim() : makePresetId();
@@ -912,10 +909,14 @@ presetJsonToggle.addEventListener("click", () => {
   if (presetJsonPanel.hidden) {
     refreshPresetJson();
     presetJsonPanel.hidden = false;
-    presetJsonToggle.textContent = "Hide JSON";
+    presetJsonToggle.textContent = "\u25b2";
+    presetJsonToggle.title = "Hide preset JSON";
+    presetJsonToggle.setAttribute("aria-expanded", "true");
   } else {
     presetJsonPanel.hidden = true;
-    presetJsonToggle.textContent = "JSON";
+    presetJsonToggle.textContent = "\u25bc";
+    presetJsonToggle.title = "Show preset JSON";
+    presetJsonToggle.setAttribute("aria-expanded", "false");
   }
 });
 presetJsonSave.addEventListener("click", savePresetJson);
@@ -1067,11 +1068,15 @@ function cacheAndReload(value) {
 function saveVideosPerRow() {
   if (!syncStorage) return;
   const value = Number(rowRange.value);
-  syncStorage.set({ videosPerRow: value }, () => cacheAndReload(value));
+  const update = { videosPerRow: value };
+  releaseNativeLayout(update);
+  syncStorage.set(update, () => cacheAndReload(value));
 }
 
 function saveUiRadius() {
-  saveSync({ uiRadius: Number(cornerRange.value) });
+  const update = { uiRadius: Number(cornerRange.value) };
+  releaseNativeLayout(update);
+  saveSync(update);
 }
 
 function customFontValue(font) {
@@ -1144,7 +1149,6 @@ function applySettings(settings) {
   cornerNumber.value = String(radius);
   cornerRange.value = String(radius);
   nativeLayoutCheckbox.checked = Boolean(settings.nativeLayout);
-  updateLayoutControlsDisabled();
   noAICheckbox.checked = Boolean(settings.noAI);
   hoverCheckbox.checked = settings.hoverHighlights !== false;
   addDislikesCheckbox.checked = settings.addDislikes !== false;
@@ -1185,7 +1189,7 @@ if (localStore?.get) {
     homeBackgroundImage = typeof local.homeBackgroundImage === "string" ? local.homeBackgroundImage : "";
     if (Array.isArray(local.presets)) {
       presetStore = local.presets.map(sanitizePreset).filter(Boolean);
-      if ((local.presetsVersion || 0) < 3) {
+      if ((local.presetsVersion || 0) < 4) {
         presetStore = presetStore.filter((preset) => preset.id !== "midnight-black" && preset.id !== "default");
         const canonical = defaultThemePresets[0];
         presetStore.unshift({
@@ -1195,10 +1199,14 @@ if (localStore?.get) {
           sidebarDisabled: [],
           backgroundImage: ""
         });
-        localStore.set({ presets: presetStore, presetsVersion: 3 });
+        presetStore = presetStore.map((preset) => {
+          if (preset.settings && typeof preset.settings.nativeLayout === "boolean") return preset;
+          return { ...preset, settings: { ...(preset.settings || {}), nativeLayout: false } };
+        });
+        localStore.set({ presets: presetStore, presetsVersion: 4 });
       }
     } else {
-      localStore.set({ presets: presetStore, presetsVersion: 3 });
+      localStore.set({ presets: presetStore, presetsVersion: 4 });
     }
     renderSidebarTree();
     renderHomeBackgroundImage();
@@ -1288,7 +1296,6 @@ fontFile.addEventListener("change", () => {
 });
 
 nativeLayoutCheckbox.addEventListener("change", () => {
-  updateLayoutControlsDisabled();
   saveSync({ nativeLayout: nativeLayoutCheckbox.checked });
 });
 

@@ -36,7 +36,7 @@ column and expands the player, description, and comments to the full width.
 every override and turns on YouTube's untouched layout (no colors, radii, row
 count, fonts, sidebar hiding, background image, or injected features), and
 **Retro YouTube**, which recreates the early YouTube site: white and light-gray
-chrome, blue video titles, a brick-red wordmark, Arial, 3 videos per row, and
+chrome, blue video titles, a brick-red wordmark, Arial, 6 videos per row, and
 0 px corners. Presets capture every setting the extension exposes — colors,
 native layout, videos per row, radii, font, Ask/hover/dislikes/hashtags/
 recommended toggles — plus hidden sidebar entries and the background image.
@@ -46,7 +46,10 @@ and — except for Default — delete. **Load** imports an exported JSON file,
 merging by id. Saved presets live in `chrome.storage.local`; Default cannot be
 deleted, overwritten, or replaced by an import. The **Use YouTube's native
 layout** toggle on Home → Main disables the row and radius overrides by hand.
-The **JSON** button at the bottom right of Presets expands an editor that shows
+With Default applied the sliders stay editable; moving either one turns native
+layout off automatically. Presets that predate the native flag apply as custom
+layouts rather than leaving the page untouched.
+The caret button at the bottom right of Presets expands a JSON editor that shows
 the applied preset (or the current settings if none matches); editing the JSON
 and pressing **Save JSON** writes the changes back to that preset and reapplies
 it. The locked Default preset is read-only there.
